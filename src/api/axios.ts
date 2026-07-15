@@ -2,7 +2,7 @@ import axios from 'axios';
 
 // 1. 명세서에 지정된 기본 API 주소 설정
 const api = axios.create({
-  baseURL: 'https://api.bottabot.com/api/v1',
+  baseURL: 'http://localhost:8000/api/v1',
   headers: {
     'Content-Type': 'application/json',
   },
