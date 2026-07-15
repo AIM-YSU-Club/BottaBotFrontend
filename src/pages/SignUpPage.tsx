@@ -7,7 +7,7 @@ const SignUpPage = () => {
   const navigate = useNavigate();
   
   // ==========================================
-  // 🚀 여기서 선언된 상태와 함수들이 있어야 아래쪽 버튼에서 에러가 안나여
+  // 🚀 여기서 선언된 상태와 함수들이 있어야 아래쪽 버튼에서 에러가 안 납니다!
   // ==========================================
   const [email, setEmail] = useState(''); 
   const [password, setPassword] = useState('');
@@ -15,7 +15,11 @@ const SignUpPage = () => {
   const [studentId, setStudentId] = useState('');
   const [nickname, setNickname] = useState('');
   const [verificationCode, setVerificationCode] = useState('');
+  
+  // 💡 아래 상태가 빠져있어서 빨간 줄이 났던 것입니다.
   const [isNicknameChecked, setIsNicknameChecked] = useState(false);
+
+  // 💡 아래 함수가 빠져있어서 빨간 줄이 났던 것입니다.
   const handleCheckNickname = async () => {
     if (!nickname.trim()) {
       alert('검사할 닉네임을 입력해 주세요.');
