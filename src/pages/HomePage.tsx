@@ -1,142 +1,262 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
+import axios from 'axios'; 
+import api from '../api/axios';
 
-// 🚀 [팀원 공유용]: 나중에 types 폴더로 분리할 메시지 타입 정의입니다.
+// ==========================================
+// 🚀 [팀원 공유용]: 타입 정의 영역
+// ==========================================
 interface Message {
   id: number;
+  sender: 'user' | 'ai';
   text: string;
-  isUser: boolean; // true면 사용자 질문, false면 AI(RAG) 답변
-  source?: string; // AI 답변일 경우 참고한 출처 (SCR08 요구사항)
 }
 
 const HomePage = () => {
-  const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+  // ==========================================
+  // 🚀 [팀원 공유용]: 상태 관리 영역
+  // ==========================================
+  const [messages, setMessages] = useState<Message[]>([
+    { id: 1, sender: 'ai', text: '안녕하세요! RAG 챗봇 봇타봇(BottaBot)입니다. 분석하고 싶은 문서를 업로드하거나 질문해 주세요.' }
+  ]);
+  
   const [inputValue, setInputValue] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
-  // 🚀 [팀원 공유용]: 현재는 임시 상태(State)로 관리하지만, 나중에는 Zustand나 Redux 같은 전역 상태로 빼거나 API 응답으로 덮어씌워야 하는 부분입니다.
-  const [messages, setMessages] = useState<Message[]>([]);
+  // 자동 스크롤을 위한 참조
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  
+  // 🚀 [추가됨]: 숨겨진 파일 입력창(input type="file")을 클릭하기 위한 참조
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // 🚀 [팀원 공유용]: 폼 제출(엔터 키 또는 보내기 버튼) 시 실행되는 함수입니다. 백엔드(AI 서버)와 통신하는 핵심 로직이 들어갈 자리입니다.
-  const handleSendMessage = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!inputValue.trim()) return;
+  // 메시지가 추가될 때마다 맨 아래로 스크롤
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
 
-    // 1. 내가 보낸 질문을 화면에 먼저 띄움
-    const newUserMsg: Message = { id: Date.now(), text: inputValue, isUser: true };
-    setMessages((prev) => [...prev, newUserMsg]);
-    setInputValue(''); // 입력창 비우기
+  // ==========================================
+  // 🚀 [팀원 공유용]: 1. 파일 업로드 API 연동
+  // ==========================================
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
 
-    // 2. 🚀 [팀원 공유용]: 여기서 백엔드(RAG API)로 newUserMsg.text 를 전송(axios.post 등)해야 합니다!
-    // 아래는 백엔드에서 응답이 왔다고 가정한 임시(Dummy) 로직입니다. (1초 뒤에 답변 도착)
-    setTimeout(() => {
-      const aiResponse: Message = {
-        id: Date.now() + 1,
-        text: '해당 내용에 대해 분석한 결과입니다. 업로드하신 소스에 따르면...',
-        isUser: false,
-        source: '[문서 1] 자바 프로그래밍 기본.pdf (p.15)', // RAG 출처 표시
+    // 🚀 [팀원 공유용]: 백엔드로 파일을 전송하기 위해 FormData 객체를 생성합니다.
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      alert(`"${file.name}" 파일을 업로드하는 중입니다... (백엔드 연동 필요)`);
+      
+      // TODO(백엔드): 문서 업로드 API 엔드포인트 수정 필요 (예: POST /api/document/upload)
+      // await api.post('/document/upload', formData, {
+      //   headers: { 'Content-Type': 'multipart/form-data' }
+      // });
+      
+      // 업로드 완료 메시지를 채팅창에 띄워줍니다.
+      const aiMessage: Message = { 
+        id: Date.now(), 
+        sender: 'ai', 
+        text: `📄 "${file.name}" 문서가 성공적으로 업로드 및 분석되었습니다. 무엇이든 물어보세요!` 
       };
-      setMessages((prev) => [...prev, aiResponse]);
-    }, 1000);
+      setMessages(prev => [...prev, aiMessage]);
+
+    } catch (error: unknown) {
+      console.error('파일 업로드 에러:', error);
+      if (axios.isAxiosError(error)) {
+        alert('파일 업로드 중 서버 문제가 발생했습니다.');
+      } else {
+        alert('알 수 없는 오류가 발생했습니다.');
+      }
+    } finally {
+      // 업로드 후 input 초기화 (같은 파일을 다시 올릴 수 있도록)
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  // 🚀 [추가됨]: 클립 아이콘이나 우측 상단 버튼을 누르면 숨겨진 파일 입력창을 강제로 클릭해주는 함수
+  const triggerFileInput = () => {
+    fileInputRef.current?.click();
+  };
+
+  // ==========================================
+  // 🚀 [팀원 공유용]: 2. AI 채팅(질문 전송) API 연동
+  // ==========================================
+  const handleSendMessage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!inputValue.trim() || isLoading) return;
+
+    // 1. 유저가 보낸 메시지를 먼저 화면에 추가
+    const userMessage: Message = { id: Date.now(), sender: 'user', text: inputValue };
+    setMessages(prev => [...prev, userMessage]);
+    setInputValue(''); 
+    setIsLoading(true); 
+
+    try {
+      // TODO(백엔드): AI 챗봇(RAG) 질문 전송 API 엔드포인트 수정 필요 (예: POST /api/chat/ask)
+      const response = await api.post('/chat/ask', { prompt: userMessage.text });
+      
+      const aiMessage: Message = { 
+        id: Date.now() + 1, 
+        sender: 'ai', 
+        text: response.data.answer || '답변을 생성할 수 없습니다.' 
+      };
+      setMessages(prev => [...prev, aiMessage]);
+
+    } catch (error: unknown) { 
+      console.error('채팅 전송 에러:', error);
+      
+      let errorText = '서버와 통신하는 중 문제가 발생했습니다. 잠시 후 다시 시도해 주세요. 😢';
+      if (!axios.isAxiosError(error)) {
+        errorText = '알 수 없는 오류가 발생했습니다. 😢';
+      }
+
+      const errorMessage: Message = { id: Date.now() + 1, sender: 'ai', text: errorText };
+      setMessages(prev => [...prev, errorMessage]);
+      
+    } finally {
+      setIsLoading(false); 
+    }
   };
 
   return (
-    <div style={{ 
-      display: 'flex', flexDirection: 'column', height: '100%', alignItems: 'center',       
-      justifyContent: 'center', background: 'radial-gradient(circle at 50% 50%, rgba(30, 45, 90, 0.3) 0%, #131314 40%)',
-      position: 'relative', padding: '0 15%' // 🚀 [팀원 공유용]: 채팅이 너무 넓게 퍼지지 않도록 좌우 패딩을 주었습니다.
-    }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', backgroundColor: '#131314', color: '#e3e3e3' }}>
       
-      {/* 우측 상단 소스 업로드 버튼 (SCR07) */}
-      <div className="icon-wrapper" style={{ position: 'absolute', top: '15px', right: '15px', color: '#c4c7c5' }} onClick={() => setIsUploadModalOpen(true)}>
-        <span style={{ fontSize: '20px' }}>🖋️</span>
-        <span className="tooltip left-side">소스 업로드</span>
-      </div>
-
       {/* ========================================== */}
-      {/* 메인 영역 (메시지가 없으면 인사말, 있으면 채팅창 출력) */}
+      {/* 🚀 [복구됨]: 상단 헤더 영역 (우측 상단 파일 업로드 버튼) */}
       {/* ========================================== */}
-      <div style={{ flex: 1, width: '100%', maxWidth: '800px', display: 'flex', flexDirection: 'column', overflowY: 'auto', padding: '40px 0', scrollbarWidth: 'none' }}>
-        
-        {messages.length === 0 ? (
-          // 1. 채팅 내역이 없을 때 (초기 화면)
-          <div style={{ margin: 'auto', textAlign: 'center' }}>
-            <h1 style={{ fontSize: '2.2rem', fontWeight: '400', color: '#e3e3e3', marginBottom: '40px' }}>무엇을 도와드릴까요?</h1>
-          </div>
-        ) : (
-          // 2. 채팅 내역이 있을 때 (대화 화면 - SCR08)
-          // 🚀 [팀원 공유용]: 나중에 이 맵핑(map) 부분 전체를 <ChatMessageList /> 같은 독립적인 컴포넌트로 분리하면 코드가 더 깔끔해집니다!
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '30px' }}>
-            {messages.map((msg) => (
-              <div key={msg.id} style={{ display: 'flex', flexDirection: 'column', alignItems: msg.isUser ? 'flex-end' : 'flex-start' }}>
-                
-                {/* 사용자 혹은 AI 아이콘 */}
-                {!msg.isUser && <div style={{ fontSize: '20px', marginBottom: '10px' }}>✨</div>}
-                
-                {/* 말풍선 */}
-                <div style={{ 
-                  backgroundColor: msg.isUser ? '#303030' : 'transparent', // 사용자는 박스형, AI는 투명 배경
-                  padding: msg.isUser ? '15px 20px' : '0',
-                  borderRadius: '20px', color: '#e3e3e3', maxWidth: '90%', lineHeight: '1.6'
-                }}>
-                  {msg.text}
-                </div>
-
-                {/* 🚀 [팀원 공유용]: RAG 모델에서 넘어온 출처(Source)를 렌더링하는 부분입니다. */}
-                {!msg.isUser && msg.source && (
-                  <div style={{ marginTop: '15px', padding: '10px', backgroundColor: '#1e1f20', borderRadius: '8px', border: '1px solid #444746', fontSize: '12px', color: '#a8c7fa', display: 'inline-block' }}>
-                    🔍 출처: {msg.source}
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* ========================================== */}
-      {/* 하단 입력창 (폼 형태로 변경하여 엔터키 지원) */}
-      {/* ========================================== */}
-      <form onSubmit={handleSendMessage} style={{ 
-        display: 'flex', alignItems: 'center', backgroundColor: '#1e1f20', 
-        borderRadius: '35px', padding: '10px 20px', width: '100%', maxWidth: '800px', 
-        boxShadow: '0 2px 6px rgba(0,0,0,0.2)', marginBottom: '30px'
+      <header style={{ 
+        display: 'flex', 
+        justifyContent: 'space-between', 
+        alignItems: 'center', 
+        padding: '20px 40px', 
+        borderBottom: '1px solid #444746',
+        backgroundColor: '#1e1f20'
       }}>
-        <span style={{ fontSize: '24px', marginRight: '15px', color: '#c4c7c5', cursor: 'pointer', fontWeight: '300' }} onClick={() => setIsUploadModalOpen(true)}>＋</span>
-        <input 
-          type="text" 
-          placeholder="Gemini에게 물어보기" 
-          value={inputValue}
-          onChange={(e) => setInputValue(e.target.value)} // 입력값 상태 업데이트
-          style={{ flex: 1, backgroundColor: 'transparent', border: 'none', color: '#e3e3e3', fontSize: '16px', outline: 'none', padding: '10px 0' }} 
-        />
-        <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-          {/* 🚀 [팀원 공유용]: 텍스트가 있을 때만 보내기(비행기) 아이콘이 뜨도록 처리했습니다. */}
-          {inputValue.trim() ? (
-            <button type="submit" style={{ background: 'transparent', border: 'none', color: '#a8c7fa', fontSize: '20px', cursor: 'pointer' }}>전송🚀</button>
-          ) : (
-            <span style={{ fontSize: '18px', color: '#c4c7c5', cursor: 'pointer' }}>🎤</span>
-          )}
-        </div>
-      </form>
+        <h2 style={{ margin: 0, fontSize: '18px', fontWeight: '500' }}>현재 진행 중인 대화</h2>
+        
+        <button 
+          onClick={triggerFileInput}
+          style={{ 
+            padding: '10px 20px', 
+            borderRadius: '8px', 
+            backgroundColor: '#303030', 
+            color: '#a8c7fa', 
+            border: '1px solid #444746', 
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            fontWeight: 'bold'
+          }}
+        >
+          <span style={{ fontSize: '16px' }}>+</span> 문서 업로드
+        </button>
+      </header>
 
-      {/* 소스 업로드 모달 (기존 코드와 동일하여 생략 없이 전체 유지) */}
-      {isUploadModalOpen && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0, 0, 0, 0.7)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 100 }}>
-          <div style={{ backgroundColor: '#1e1f20', padding: '30px', borderRadius: '15px', width: '500px', border: '1px solid #444746', boxShadow: '0 10px 25px rgba(0,0,0,0.5)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-              <h2 style={{ margin: 0, color: '#e3e3e3', fontSize: '20px', fontWeight: '500' }}>새 소스 추가</h2>
-              <button type="button" onClick={() => setIsUploadModalOpen(false)} style={{ background: 'transparent', border: 'none', color: '#c4c7c5', fontSize: '20px', cursor: 'pointer' }}>✖</button>
+      {/* 숨겨진 파일 입력창 (실제 파일 탐색기를 띄우는 역할) */}
+      <input 
+        type="file" 
+        ref={fileInputRef} 
+        onChange={handleFileSelect} 
+        style={{ display: 'none' }} 
+        accept=".pdf,.doc,.docx,.txt" // RAG 챗봇에서 주로 쓰이는 문서 확장자만 허용
+      />
+
+      {/* 1. 채팅 내역 출력 영역 */}
+      <div style={{ flex: 1, overflowY: 'auto', padding: '40px 20px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+        <div style={{ maxWidth: '800px', margin: '0 auto', width: '100%', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          
+          {messages.map((msg) => (
+            <div key={msg.id} style={{ display: 'flex', justifyContent: msg.sender === 'user' ? 'flex-end' : 'flex-start' }}>
+              
+              {msg.sender === 'ai' && (
+                <div style={{ 
+                  width: '36px', height: '36px', borderRadius: '50%', backgroundColor: '#303030', 
+                  display: 'flex', justifyContent: 'center', alignItems: 'center', marginRight: '15px', fontSize: '18px' 
+                }}>
+                  🤖
+                </div>
+              )}
+
+              <div style={{ 
+                maxWidth: '80%', padding: '15px 20px', borderRadius: '15px', lineHeight: '1.6',
+                backgroundColor: msg.sender === 'user' ? '#1e1f20' : 'transparent', 
+                border: msg.sender === 'user' ? '1px solid #444746' : 'none',
+              }}>
+                {msg.text}
+              </div>
             </div>
-            <div style={{ border: '2px dashed #444746', borderRadius: '10px', padding: '40px', textAlign: 'center', marginBottom: '20px', cursor: 'pointer', backgroundColor: '#131314' }}>
-              <div style={{ fontSize: '30px', marginBottom: '10px' }}>📄</div>
-              <div style={{ color: '#e3e3e3', marginBottom: '5px' }}>클릭하거나 파일을 여기로 드래그하세요</div>
+          ))}
+
+          {/* 로딩 표시기 */}
+          {isLoading && (
+            <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
+              <div style={{ 
+                width: '36px', height: '36px', borderRadius: '50%', backgroundColor: '#303030', 
+                display: 'flex', justifyContent: 'center', alignItems: 'center', marginRight: '15px', fontSize: '18px' 
+              }}>🤖</div>
+              <div style={{ padding: '15px 20px', color: '#a8c7fa', animation: 'pulse 1.5s infinite' }}>
+                답변을 생성하고 있습니다...
+              </div>
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-              <input type="text" placeholder="또는 분석할 웹사이트 URL 입력" style={{ width: '100%', padding: '12px', borderRadius: '8px', backgroundColor: '#131314', border: '1px solid #444746', color: 'white', outline: 'none', boxSizing: 'border-box' }} />
-              <button type="button" style={{ padding: '12px', borderRadius: '8px', backgroundColor: '#a8c7fa', color: '#041e49', fontWeight: 'bold', border: 'none', cursor: 'pointer' }}>소스 업로드하기</button>
-            </div>
-          </div>
+          )}
+          
+          <div ref={messagesEndRef} /> 
         </div>
-      )}
+      </div>
+
+      {/* 2. 하단 입력창 (프롬프트 입력 영역) */}
+      <div style={{ padding: '20px', backgroundColor: '#131314', display: 'flex', justifyContent: 'center' }}>
+        <form 
+          onSubmit={handleSendMessage} 
+          style={{ width: '100%', maxWidth: '800px', position: 'relative', display: 'flex', alignItems: 'center' }}
+        >
+          {/* ========================================== */}
+          {/* 🚀 [복구됨]: 입력창 좌측 클립(파일 첨부) 아이콘 */}
+          {/* ========================================== */}
+          <button 
+            type="button" 
+            onClick={triggerFileInput}
+            style={{ 
+              position: 'absolute', left: '15px', width: '30px', height: '30px', 
+              background: 'transparent', border: 'none', color: '#c4c7c5', 
+              cursor: 'pointer', fontSize: '20px', display: 'flex', justifyContent: 'center', alignItems: 'center',
+              zIndex: 10
+            }}
+          >
+            📎
+          </button>
+
+          <input 
+            type="text" 
+            placeholder="업로드한 문서에 대해 질문해 보세요..." 
+            value={inputValue}
+            onChange={(e) => setInputValue(e.target.value)}
+            disabled={isLoading}
+            style={{ 
+              width: '100%', padding: '18px 60px 18px 55px', borderRadius: '30px', // 좌측 클립 아이콘 공간(55px) 확보
+              backgroundColor: '#1e1f20', border: '1px solid #444746', 
+              color: 'white', outline: 'none', fontSize: '15px',
+              boxShadow: '0 4px 15px rgba(0,0,0,0.3)'
+            }} 
+          />
+
+          <button 
+            type="submit" 
+            disabled={!inputValue.trim() || isLoading}
+            style={{ 
+              position: 'absolute', right: '10px', width: '40px', height: '40px', 
+              borderRadius: '50%', backgroundColor: inputValue.trim() ? '#a8c7fa' : '#303030', 
+              color: inputValue.trim() ? '#041e49' : '#7a7c7f', 
+              border: 'none', cursor: inputValue.trim() ? 'pointer' : 'not-allowed',
+              display: 'flex', justifyContent: 'center', alignItems: 'center', transition: 'background-color 0.2s'
+            }}
+          >
+            <span style={{ transform: 'rotate(45deg)', marginTop: '-2px', marginLeft: '-2px', fontSize: '18px' }}>🚀</span>
+          </button>
+        </form>
+      </div>
+
     </div>
   );
 };

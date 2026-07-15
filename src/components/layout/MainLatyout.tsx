@@ -1,178 +1,211 @@
 import React, { useState } from 'react';
-import { Outlet, Link, useNavigate } from 'react-router-dom'; 
-import '../../index.css'; 
-
-interface Notification {
-  id: number;
-  message: string;
-  isRead: boolean;
-  date: string;
-}
+import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 
 const MainLayout = () => {
-  const navigate = useNavigate(); 
-
-  const [isNotebookModalOpen, setIsNotebookModalOpen] = useState(false);
-  const [isNotiOpen, setIsNotiOpen] = useState(false);
-
-  // ==========================================
-  // 🚀 [팀원 공유용]: 인증(Auth) 상태 관리 영역
-  // ==========================================
-  // TODO(프론트/백엔드): 현재는 UI 테스트를 위해 임시로 'false(로그아웃 상태)'로 하드코딩 되어 있습니다.
-  // 실제 연동 시에는 Zustand, Redux 같은 전역 상태나 localStorage.getItem('token') 등을 통해 
-  // 사용자가 로그인했는지 여부를 판별하여 이 값을 true/false로 동적 업데이트해야 합니다.
-  const [isLoggedIn, setIsLoggedIn] = useState(false); 
+  const navigate = useNavigate();
+  const location = useLocation(); 
   
-  // TODO(백엔드): 로그인 API 응답으로 받아온 유저의 이름(닉네임)을 전역 상태에서 불러와 여기에 넣어야 합니다.  
-  const userName = "범준"; 
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false); 
+  
+  // ==========================================
+  // 🚀 [추가됨]: 어떤 아이콘에 마우스가 올라가 있는지 추적하는 상태
+  // ==========================================
+  const [hoveredId, setHoveredId] = useState<string | null>(null);
 
-  const [notifications, setNotifications] = useState<Notification[]>([
-    { id: 1, message: '📄 "자바 프로그래밍.pdf" 분석이 완료되었습니다.', isRead: false, date: '10분 전' },
-    { id: 2, message: '🎉 회원가입을 환영합니다! 첫 프롬프트를 입력해 보세요.', isRead: true, date: '1일 전' },
-  ]);
+  const menuItems = [
+    { id: 'new', icon: '✨', label: '새 채팅', path: '/' },
+    { id: 'memo', icon: '📝', label: '프롬프트 노트', path: '/' },
+    { id: 'search', icon: '🔍', label: '채팅 검색', path: '/' },
+    { id: 'chat', icon: '💬', label: '대화 기록', path: '/' },
+    { id: 'library', icon: '📁', label: '라이브러리', path: '/' },
+    { id: 'notice', icon: '🔔', label: '알림', path: '/' },
+  ];
 
-  const handleMarkAsRead = (id: number) => {
-    setNotifications((prev) => 
-      prev.map((noti) => noti.id === id ? { ...noti, isRead: true } : noti)
-    );
-  };
+  const recentChats = [
+    "한자 일본어 발음 및 뜻",
+    "초보자를 위한 챗봇 개발 로드맵",
+    "Git Push Error: `main` Refspec Not Found...",
+    "FastAPI 강의 명령어 윈도우 CMD 변환",
+  ];
 
-  const unreadCount = notifications.filter(n => !n.isRead).length;
+  // ==========================================
+  // 🚀 [추가됨]: 말풍선(툴팁) 컴포넌트 분리
+  // 반복되는 말풍선 UI를 깔끔하게 함수로 만들었습니다.
+  // ==========================================
+  const renderTooltip = (text: string) => (
+    <div style={{
+      position: 'absolute',
+      left: '100%', // 아이콘의 오른쪽 끝을 기준으로 배치
+      top: '50%',
+      transform: 'translateY(-50%)',
+      marginLeft: '15px', // 아이콘과 말풍선 사이의 간격
+      backgroundColor: '#e3e3e3',
+      color: '#131314',
+      padding: '8px 12px',
+      borderRadius: '8px',
+      fontSize: '13px',
+      fontWeight: 'bold',
+      whiteSpace: 'nowrap',
+      zIndex: 1000,
+      boxShadow: '0 4px 10px rgba(0,0,0,0.5)',
+      animation: 'fadeIn 0.2s ease-out'
+    }}>
+      {/* 말풍선 왼쪽의 뾰족한 꼬리표(삼각형) 만들기 */}
+      <div style={{
+        position: 'absolute',
+        left: '-6px',
+        top: '50%',
+        transform: 'translateY(-50%)',
+        borderTop: '6px solid transparent',
+        borderBottom: '6px solid transparent',
+        borderRight: '6px solid #e3e3e3'
+      }} />
+      {text}
+    </div>
+  );
 
   return (
-    <div style={{ display: 'flex', height: '100vh', backgroundColor: '#131314', color: '#e3e3e3', margin: 0, overflow: 'hidden' }}>
+    <div style={{ display: 'flex', height: '100vh', backgroundColor: '#131314', color: '#e3e3e3', overflow: 'hidden' }}>
       
-      {/* 1. 좌측 얇은 아이콘 사이드바 */}
-      <aside style={{ 
-        width: '68px', backgroundColor: '#1e1f20', display: 'flex', flexDirection: 'column', 
-        alignItems: 'center', justifyContent: 'space-between', padding: '20px 0', margin: 0, zIndex: 50
-      }}>
-        
-        {/* 상단 메인 메뉴들 */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', alignItems: 'center' }}>
-          <div className="icon-wrapper"><span style={{ fontSize: '20px' }}>✨</span></div>
-          <div className="icon-wrapper"><span style={{ fontSize: '18px' }}>📝</span><span className="tooltip">새 채팅</span></div>
-          <div className="icon-wrapper"><span style={{ fontSize: '18px' }}>🔍</span><span className="tooltip">검색</span></div>
-          <div className="icon-wrapper"><span style={{ fontSize: '18px' }}>💬</span><span className="tooltip">최근 대화</span></div>
-          
-          <div className="icon-wrapper" onClick={() => setIsNotebookModalOpen(true)}>
-            <span style={{ fontSize: '18px' }}>📁</span><span className="tooltip">노트북 관리</span>
-          </div>
-
-          <div className="icon-wrapper" onClick={() => setIsNotiOpen(!isNotiOpen)} style={{ position: 'relative' }}>
-            <span style={{ fontSize: '18px' }}>🔔</span>
-            <span className="tooltip">알림 센터</span>
-            {unreadCount > 0 && (
-              <div style={{ position: 'absolute', top: '5px', right: '5px', width: '8px', height: '8px', backgroundColor: '#f28b82', borderRadius: '50%' }} />
-            )}
+      <nav 
+        style={{ 
+          width: isSidebarOpen ? '280px' : '70px', 
+          transition: 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1)', 
+          backgroundColor: '#1e1f20', 
+          display: 'flex', 
+          flexDirection: 'column', 
+          borderRight: '1px solid #444746',
+          whiteSpace: 'nowrap' 
+        }}
+      >
+        {/* 1. 사이드바 토글 (열기/닫기) 버튼 */}
+        <div style={{ padding: '15px', display: 'flex', alignItems: 'center', height: '60px', boxSizing: 'border-box' }}>
+          <div 
+            style={{ position: 'relative', display: 'inline-block' }}
+            onMouseEnter={() => setHoveredId('toggle')}
+            onMouseLeave={() => setHoveredId(null)}
+          >
+            <button 
+              onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+              style={{ 
+                width: '40px', height: '40px', borderRadius: '50%', backgroundColor: hoveredId === 'toggle' ? '#303030' : 'transparent', border: 'none', 
+                color: '#c4c7c5', fontSize: '20px', cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center', transition: 'background-color 0.2s'
+              }}
+            >
+              ☰
+            </button>
+            {/* 햄버거 버튼 말풍선: 열려있든 닫혀있든 마우스 올리면 항상 뜹니다 */}
+            {hoveredId === 'toggle' && renderTooltip(isSidebarOpen ? '사이드바 닫기' : '사이드바 열기')}
           </div>
         </div>
 
-        {/* 하단 유저 메뉴들 */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', alignItems: 'center' }}>
-          <div className="icon-wrapper">
-            <Link to="/profile" style={{ textDecoration: 'none', fontSize: '20px' }}>⚙️</Link>
-            <span className="tooltip">설정</span>
-          </div>
-          
-          {/* ========================================== */}
-          {/* 🚀 [팀원 공유용]: 로그인 상태(isLoggedIn)에 따른 아이콘 조건부 렌더링 */}
-          {/* ========================================== */}
-          {isLoggedIn ? (
-            // [상태 A] 로그인이 되어 있을 때: 유저의 이름이 적힌 파란색 동그라미를 보여줌
+        {/* 2. 상단 메인 메뉴들 */}
+        <div style={{ padding: '10px', display: 'flex', flexDirection: 'column', gap: '5px' }}>
+          {menuItems.map((item) => (
             <div 
-              onClick={() => navigate('/profile')} // 로그인된 상태면 클릭 시 내 정보(프로필) 페이지로 이동
-              style={{ 
-                width: '32px', height: '32px', borderRadius: '50%', backgroundColor: '#005a9e', 
-                display: 'flex', justifyContent: 'center', alignItems: 'center', 
-                fontSize: '12px', fontWeight: 'bold', color: 'white', cursor: 'pointer' 
-              }}
+              key={item.id} 
+              style={{ position: 'relative' }}
+              onMouseEnter={() => setHoveredId(item.id)}
+              onMouseLeave={() => setHoveredId(null)}
             >
-              {userName}
+              <button
+                onClick={() => navigate(item.path)}
+                style={{
+                  display: 'flex', alignItems: 'center', padding: '10px 12px', borderRadius: '8px', cursor: 'pointer', border: 'none',
+                  backgroundColor: location.pathname === item.path && item.id === 'new' ? '#303030' : hoveredId === item.id ? '#2a2b2c' : 'transparent', 
+                  color: '#e3e3e3', transition: 'background-color 0.2s', width: '100%', textAlign: 'left'
+                }}
+              >
+                <span style={{ fontSize: '18px', width: '24px', textAlign: 'center', marginRight: isSidebarOpen ? '15px' : '0', transition: 'margin 0.3s' }}>
+                  {item.icon}
+                </span>
+                
+                <span style={{ fontSize: '14px', opacity: isSidebarOpen ? 1 : 0, transition: 'opacity 0.2s', pointerEvents: isSidebarOpen ? 'auto' : 'none' }}>
+                  {item.label}
+                </span>
+              </button>
+              {/* 🚀 메뉴 말풍선: 사이드바가 접혀있을 때(!isSidebarOpen)만 뜹니다 */}
+              {hoveredId === item.id && !isSidebarOpen && renderTooltip(item.label)}
             </div>
-          ) : (
-            // [상태 B] 로그인이 안 되어 있을 때: 열쇠(🔑) 아이콘을 보여주고, 클릭 시 로그인 페이지로 보냄
-            <div className="icon-wrapper" onClick={() => navigate('/login')}>
-              <span style={{ fontSize: '20px' }}>🔑</span>
-              <span className="tooltip">로그인 하러가기</span>
+          ))}
+        </div>
+
+        {/* 3. 최근 대화 내역 */}
+        <div style={{ flex: 1, overflowY: 'auto', padding: '10px', marginTop: '10px' }}>
+          {isSidebarOpen && (
+            <div style={{ animation: 'fadeIn 0.5s ease-out' }}>
+              <div style={{ fontSize: '13px', color: '#c4c7c5', padding: '10px 12px', marginBottom: '5px' }}>최근</div>
+              {recentChats.map((chatTitle, index) => (
+                <div 
+                  key={index} 
+                  style={{ 
+                    padding: '8px 12px', fontSize: '13px', color: '#e3e3e3', cursor: 'pointer', borderRadius: '8px',
+                    whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' 
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#303030'}
+                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                >
+                  {chatTitle}
+                </div>
+              ))}
             </div>
           )}
         </div>
-      </aside>
 
-      {/* 2. 알림 센터 우측 슬라이드 패널 */}
-      {isNotiOpen && (
-        <div style={{ 
-          width: '300px', backgroundColor: '#1e1f20', borderRight: '1px solid #444746', 
-          display: 'flex', flexDirection: 'column', padding: '20px', zIndex: 40,
-          animation: 'slideIn 0.2s ease-out'
-        }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-            <h3 style={{ margin: 0, fontSize: '16px', fontWeight: '500' }}>알림 센터</h3>
-            <button onClick={() => setIsNotiOpen(false)} style={{ background: 'transparent', border: 'none', color: '#c4c7c5', cursor: 'pointer', fontSize: '16px' }}>✖</button>
-          </div>
+        {/* 4. 하단 설정 및 프로필 */}
+        <div style={{ padding: '10px', borderTop: '1px solid #444746', display: 'flex', flexDirection: 'column', gap: '5px' }}>
           
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', overflowY: 'auto' }}>
-            {notifications.length === 0 ? (
-              <p style={{ color: '#c4c7c5', fontSize: '14px', textAlign: 'center', marginTop: '20px' }}>새로운 알림이 없습니다.</p>
-            ) : (
-              notifications.map((noti) => (
-                <div key={noti.id} style={{ 
-                  padding: '12px', borderRadius: '8px', 
-                  backgroundColor: noti.isRead ? 'transparent' : '#2a2b2f', 
-                  border: '1px solid #444746', display: 'flex', flexDirection: 'column', gap: '5px' 
-                }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                    <span style={{ fontSize: '13px', color: '#e3e3e3', lineHeight: '1.4' }}>{noti.message}</span>
-                    {!noti.isRead && (
-                      <button onClick={() => handleMarkAsRead(noti.id)} style={{ background: 'transparent', border: 'none', color: '#a8c7fa', fontSize: '11px', cursor: 'pointer', whiteSpace: 'nowrap', marginLeft: '10px' }}>
-                        읽음
-                      </button>
-                    )}
-                  </div>
-                  <span style={{ fontSize: '11px', color: '#7a7c7f' }}>{noti.date}</span>
-                </div>
-              ))
-            )}
+          {/* 설정 버튼 */}
+          <div 
+            style={{ position: 'relative' }}
+            onMouseEnter={() => setHoveredId('settings')}
+            onMouseLeave={() => setHoveredId(null)}
+          >
+            <button
+              onClick={() => navigate('/settings')}
+              style={{
+                display: 'flex', alignItems: 'center', padding: '10px 12px', borderRadius: '8px', cursor: 'pointer', border: 'none',
+                backgroundColor: location.pathname === '/settings' ? '#303030' : hoveredId === 'settings' ? '#2a2b2c' : 'transparent', color: '#e3e3e3', width: '100%'
+              }}
+            >
+              <span style={{ fontSize: '18px', width: '24px', textAlign: 'center', marginRight: isSidebarOpen ? '15px' : '0' }}>⚙️</span>
+              <span style={{ fontSize: '14px', opacity: isSidebarOpen ? 1 : 0, transition: 'opacity 0.2s' }}>설정</span>
+            </button>
+            {hoveredId === 'settings' && !isSidebarOpen && renderTooltip('환경 설정')}
+          </div>
+
+          {/* 프로필 버튼 */}
+          <div 
+            style={{ position: 'relative' }}
+            onMouseEnter={() => setHoveredId('profile')}
+            onMouseLeave={() => setHoveredId(null)}
+          >
+            <button
+              onClick={() => navigate('/profile')}
+              style={{
+                display: 'flex', alignItems: 'center', padding: '10px 12px', borderRadius: '8px', cursor: 'pointer', border: 'none',
+                backgroundColor: location.pathname === '/profile' ? '#303030' : hoveredId === 'profile' ? '#2a2b2c' : 'transparent', color: '#e3e3e3', width: '100%'
+              }}
+            >
+              <div style={{ 
+                width: '24px', height: '24px', borderRadius: '50%', backgroundColor: '#0b57d0', color: 'white', 
+                display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '11px', fontWeight: 'bold',
+                marginRight: isSidebarOpen ? '15px' : '0'
+              }}>
+                범준
+              </div>
+              <span style={{ fontSize: '14px', opacity: isSidebarOpen ? 1 : 0, transition: 'opacity 0.2s' }}>내 프로필</span>
+            </button>
+            {hoveredId === 'profile' && !isSidebarOpen && renderTooltip('내 프로필 (계정 관리)')}
           </div>
         </div>
-      )}
 
-      {/* 3. 우측 메인 영역 */}
-      <main style={{ flex: 1, position: 'relative' }}>
+      </nav>
+
+      <main style={{ flex: 1, position: 'relative', overflowY: 'auto' }}>
         <Outlet /> 
       </main>
 
-      {/* 4. 내 노트북 관리 모달 */}
-      {isNotebookModalOpen && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0, 0, 0, 0.7)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 100 }}>
-          <div style={{ backgroundColor: '#1e1f20', padding: '30px', borderRadius: '15px', width: '500px', border: '1px solid #444746', boxShadow: '0 10px 25px rgba(0,0,0,0.5)' }}>
-            
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-              <h2 style={{ margin: 0, color: '#e3e3e3', fontSize: '20px', fontWeight: '500' }}>내 노트북 관리</h2>
-              <button onClick={() => setIsNotebookModalOpen(false)} style={{ background: 'transparent', border: 'none', color: '#c4c7c5', fontSize: '20px', cursor: 'pointer' }}>✖</button>
-            </div>
-            
-            <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
-              <li style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '15px 0', borderBottom: '1px solid #444746' }}>
-                <span style={{ color: '#e3e3e3' }}>📗 리눅스 명령어 모음</span>
-                <div>
-                  <button style={{ background: 'transparent', border: 'none', color: '#a8c7fa', cursor: 'pointer', marginRight: '10px' }}>수정</button>
-                  <button style={{ background: 'transparent', border: 'none', color: '#f28b82', cursor: 'pointer' }}>삭제</button>
-                </div>
-              </li>
-              
-              <li style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '15px 0', borderBottom: '1px solid #444746' }}>
-                <span style={{ color: '#e3e3e3' }}>📘 자바 프로그래밍 정리</span>
-                <div>
-                  <button style={{ background: 'transparent', border: 'none', color: '#a8c7fa', cursor: 'pointer', marginRight: '10px' }}>수정</button>
-                  <button style={{ background: 'transparent', border: 'none', color: '#f28b82', cursor: 'pointer' }}>삭제</button>
-                </div>
-              </li>
-            </ul>
-          </div>
-        </div>
-      )}
     </div>
   );
 };
