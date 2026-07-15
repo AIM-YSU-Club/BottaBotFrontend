@@ -5,12 +5,8 @@ const MainLayout = () => {
   const navigate = useNavigate();
   const location = useLocation(); 
   
+  // 🚀 기존 기능 100% 유지: 사이드바 열림/닫힘 상태
   const [isSidebarOpen, setIsSidebarOpen] = useState(false); 
-  
-  // ==========================================
-  // 🚀 [추가됨]: 어떤 아이콘에 마우스가 올라가 있는지 추적하는 상태
-  // ==========================================
-  const [hoveredId, setHoveredId] = useState<string | null>(null);
 
   const menuItems = [
     { id: 'new', icon: '✨', label: '새 채팅', path: '/' },
@@ -28,183 +24,130 @@ const MainLayout = () => {
     "FastAPI 강의 명령어 윈도우 CMD 변환",
   ];
 
-  // ==========================================
-  // 🚀 [추가됨]: 말풍선(툴팁) 컴포넌트 분리
-  // 반복되는 말풍선 UI를 깔끔하게 함수로 만들었습니다.
-  // ==========================================
-  const renderTooltip = (text: string) => (
-    <div style={{
-      position: 'absolute',
-      left: '100%', // 아이콘의 오른쪽 끝을 기준으로 배치
-      top: '50%',
-      transform: 'translateY(-50%)',
-      marginLeft: '15px', // 아이콘과 말풍선 사이의 간격
-      backgroundColor: '#e3e3e3',
-      color: '#131314',
-      padding: '8px 12px',
-      borderRadius: '8px',
-      fontSize: '13px',
-      fontWeight: 'bold',
-      whiteSpace: 'nowrap',
-      zIndex: 1000,
-      boxShadow: '0 4px 10px rgba(0,0,0,0.5)',
-      animation: 'fadeIn 0.2s ease-out'
-    }}>
-      {/* 말풍선 왼쪽의 뾰족한 꼬리표(삼각형) 만들기 */}
-      <div style={{
-        position: 'absolute',
-        left: '-6px',
-        top: '50%',
-        transform: 'translateY(-50%)',
-        borderTop: '6px solid transparent',
-        borderBottom: '6px solid transparent',
-        borderRight: '6px solid #e3e3e3'
-      }} />
-      {text}
-    </div>
-  );
-
   return (
-    <div style={{ display: 'flex', height: '100vh', backgroundColor: '#131314', color: '#e3e3e3', overflow: 'hidden' }}>
+    // 🎨 새 디자인: 전체를 감싸는 app-shell 클래스 적용
+    <div className="app-shell">
       
-      <nav 
+      {/* 🎨 새 디자인: sidebar 클래스 적용 + 열림/닫힘 애니메이션 인라인 혼합 */}
+      <aside 
+        className="sidebar"
         style={{ 
-          width: isSidebarOpen ? '280px' : '70px', 
-          transition: 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1)', 
-          backgroundColor: '#1e1f20', 
-          display: 'flex', 
-          flexDirection: 'column', 
-          borderRight: '1px solid #444746',
-          whiteSpace: 'nowrap' 
+          width: isSidebarOpen ? '260px' : 'var(--sidebar-w)', 
+          transition: 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+          alignItems: isSidebarOpen ? 'stretch' : 'center',
+          padding: isSidebarOpen ? '16px 20px' : '16px 0 20px'
         }}
       >
-        {/* 1. 사이드바 토글 (열기/닫기) 버튼 */}
-        <div style={{ padding: '15px', display: 'flex', alignItems: 'center', height: '60px', boxSizing: 'border-box' }}>
+        <div className="sidebar-group" style={{ width: '100%' }}>
+          
+          {/* 1. 사이드바 토글 (열기/닫기) 버튼 */}
           <div 
-            style={{ position: 'relative', display: 'inline-block' }}
-            onMouseEnter={() => setHoveredId('toggle')}
-            onMouseLeave={() => setHoveredId(null)}
+            className="icon-btn ghost" 
+            data-label={isSidebarOpen ? '' : '메뉴 열기/닫기'} // CSS 툴팁 활용!
+            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+            style={{ 
+              width: isSidebarOpen ? '100%' : '44px',
+              justifyContent: isSidebarOpen ? 'flex-start' : 'center',
+              padding: isSidebarOpen ? '0 12px' : '0'
+            }}
           >
-            <button 
-              onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-              style={{ 
-                width: '40px', height: '40px', borderRadius: '50%', backgroundColor: hoveredId === 'toggle' ? '#303030' : 'transparent', border: 'none', 
-                color: '#c4c7c5', fontSize: '20px', cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center', transition: 'background-color 0.2s'
-              }}
-            >
-              ☰
-            </button>
-            {/* 햄버거 버튼 말풍선: 열려있든 닫혀있든 마우스 올리면 항상 뜹니다 */}
-            {hoveredId === 'toggle' && renderTooltip(isSidebarOpen ? '사이드바 닫기' : '사이드바 열기')}
+            <span style={{ fontSize: '20px' }}>☰</span>
           </div>
-        </div>
 
-        {/* 2. 상단 메인 메뉴들 */}
-        <div style={{ padding: '10px', display: 'flex', flexDirection: 'column', gap: '5px' }}>
-          {menuItems.map((item) => (
-            <div 
-              key={item.id} 
-              style={{ position: 'relative' }}
-              onMouseEnter={() => setHoveredId(item.id)}
-              onMouseLeave={() => setHoveredId(null)}
-            >
-              <button
+          <div className="sidebar-divider" style={{ width: isSidebarOpen ? '100%' : '28px' }}></div>
+
+          {/* 2. 상단 메인 메뉴들 */}
+          {menuItems.map((item) => {
+            const isActive = location.pathname === item.path && item.id === 'new';
+            return (
+              <div 
+                key={item.id} 
+                className={`icon-btn ${isActive ? 'active' : ''}`}
+                data-label={!isSidebarOpen ? item.label : ''} // 사이드바가 닫혀있을 때만 CSS 툴팁 표시
                 onClick={() => navigate(item.path)}
                 style={{
-                  display: 'flex', alignItems: 'center', padding: '10px 12px', borderRadius: '8px', cursor: 'pointer', border: 'none',
-                  backgroundColor: location.pathname === item.path && item.id === 'new' ? '#303030' : hoveredId === item.id ? '#2a2b2c' : 'transparent', 
-                  color: '#e3e3e3', transition: 'background-color 0.2s', width: '100%', textAlign: 'left'
+                  width: isSidebarOpen ? '100%' : '44px',
+                  justifyContent: isSidebarOpen ? 'flex-start' : 'center',
+                  padding: isSidebarOpen ? '0 12px' : '0',
                 }}
               >
-                <span style={{ fontSize: '18px', width: '24px', textAlign: 'center', marginRight: isSidebarOpen ? '15px' : '0', transition: 'margin 0.3s' }}>
+                <span style={{ fontSize: '18px', width: '24px', textAlign: 'center' }}>
                   {item.icon}
                 </span>
                 
-                <span style={{ fontSize: '14px', opacity: isSidebarOpen ? 1 : 0, transition: 'opacity 0.2s', pointerEvents: isSidebarOpen ? 'auto' : 'none' }}>
-                  {item.label}
-                </span>
-              </button>
-              {/* 🚀 메뉴 말풍선: 사이드바가 접혀있을 때(!isSidebarOpen)만 뜹니다 */}
-              {hoveredId === item.id && !isSidebarOpen && renderTooltip(item.label)}
-            </div>
-          ))}
+                {isSidebarOpen && (
+                  <span style={{ fontSize: '14px', marginLeft: '12px', fontWeight: 600 }}>
+                    {item.label}
+                  </span>
+                )}
+              </div>
+            );
+          })}
         </div>
 
-        {/* 3. 최근 대화 내역 */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '10px', marginTop: '10px' }}>
-          {isSidebarOpen && (
-            <div style={{ animation: 'fadeIn 0.5s ease-out' }}>
-              <div style={{ fontSize: '13px', color: '#c4c7c5', padding: '10px 12px', marginBottom: '5px' }}>최근</div>
-              {recentChats.map((chatTitle, index) => (
-                <div 
-                  key={index} 
-                  style={{ 
-                    padding: '8px 12px', fontSize: '13px', color: '#e3e3e3', cursor: 'pointer', borderRadius: '8px',
-                    whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' 
-                  }}
-                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#303030'}
-                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-                >
-                  {chatTitle}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+        {/* 3. 최근 대화 내역 (사이드바 열렸을 때만 표시) */}
+        {isSidebarOpen && (
+          <div style={{ flex: 1, width: '100%', overflowY: 'auto', marginTop: '20px', padding: '0 8px', animation: 'fadeIn 0.3s ease-out' }}>
+            <div style={{ fontSize: '12px', color: 'var(--ink-soft)', fontWeight: 700, marginBottom: '8px', paddingLeft: '4px' }}>최근 대화</div>
+            {recentChats.map((chatTitle, index) => (
+              <div 
+                key={index} 
+                style={{ 
+                  padding: '10px 12px', fontSize: '13px', color: 'var(--ink)', cursor: 'pointer', borderRadius: '8px',
+                  whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', transition: 'background 0.2s'
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--leaf-soft)'}
+                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+              >
+                {chatTitle}
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* 4. 하단 설정 및 프로필 */}
-        <div style={{ padding: '10px', borderTop: '1px solid #444746', display: 'flex', flexDirection: 'column', gap: '5px' }}>
+        <div className="sidebar-group" style={{ width: '100%', marginTop: 'auto', paddingTop: '10px', borderTop: isSidebarOpen ? '1px solid var(--leaf-line)' : 'none' }}>
           
           {/* 설정 버튼 */}
           <div 
-            style={{ position: 'relative' }}
-            onMouseEnter={() => setHoveredId('settings')}
-            onMouseLeave={() => setHoveredId(null)}
+            className={`icon-btn ghost ${location.pathname === '/settings' ? 'active' : ''}`}
+            data-label={!isSidebarOpen ? '환경 설정' : ''}
+            onClick={() => navigate('/settings')}
+            style={{
+              width: isSidebarOpen ? '100%' : '44px',
+              justifyContent: isSidebarOpen ? 'flex-start' : 'center',
+              padding: isSidebarOpen ? '0 12px' : '0',
+            }}
           >
-            <button
-              onClick={() => navigate('/settings')}
-              style={{
-                display: 'flex', alignItems: 'center', padding: '10px 12px', borderRadius: '8px', cursor: 'pointer', border: 'none',
-                backgroundColor: location.pathname === '/settings' ? '#303030' : hoveredId === 'settings' ? '#2a2b2c' : 'transparent', color: '#e3e3e3', width: '100%'
-              }}
-            >
-              <span style={{ fontSize: '18px', width: '24px', textAlign: 'center', marginRight: isSidebarOpen ? '15px' : '0' }}>⚙️</span>
-              <span style={{ fontSize: '14px', opacity: isSidebarOpen ? 1 : 0, transition: 'opacity 0.2s' }}>설정</span>
-            </button>
-            {hoveredId === 'settings' && !isSidebarOpen && renderTooltip('환경 설정')}
+            <span style={{ fontSize: '18px', width: '24px', textAlign: 'center' }}>⚙️</span>
+            {isSidebarOpen && <span style={{ fontSize: '14px', marginLeft: '12px', fontWeight: 600 }}>설정</span>}
           </div>
 
           {/* 프로필 버튼 */}
           <div 
-            style={{ position: 'relative' }}
-            onMouseEnter={() => setHoveredId('profile')}
-            onMouseLeave={() => setHoveredId(null)}
+            className={`icon-btn ghost ${location.pathname === '/profile' ? 'active' : ''}`}
+            data-label={!isSidebarOpen ? '내 프로필 (계정 관리)' : ''}
+            onClick={() => navigate('/profile')}
+            style={{
+              width: isSidebarOpen ? '100%' : '44px',
+              justifyContent: isSidebarOpen ? 'flex-start' : 'center',
+              padding: isSidebarOpen ? '0 12px' : '0',
+              marginTop: '4px'
+            }}
           >
-            <button
-              onClick={() => navigate('/profile')}
-              style={{
-                display: 'flex', alignItems: 'center', padding: '10px 12px', borderRadius: '8px', cursor: 'pointer', border: 'none',
-                backgroundColor: location.pathname === '/profile' ? '#303030' : hoveredId === 'profile' ? '#2a2b2c' : 'transparent', color: '#e3e3e3', width: '100%'
-              }}
-            >
-              <div style={{ 
-                width: '24px', height: '24px', borderRadius: '50%', backgroundColor: '#0b57d0', color: 'white', 
-                display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '11px', fontWeight: 'bold',
-                marginRight: isSidebarOpen ? '15px' : '0'
-              }}>
-                범준
-              </div>
-              <span style={{ fontSize: '14px', opacity: isSidebarOpen ? 1 : 0, transition: 'opacity 0.2s' }}>내 프로필</span>
-            </button>
-            {hoveredId === 'profile' && !isSidebarOpen && renderTooltip('내 프로필 (계정 관리)')}
+            <div className="avatar" style={{ width: '28px', height: '28px', fontSize: '11px', flex: 'none' }}>
+              범준
+            </div>
+            {isSidebarOpen && <span style={{ fontSize: '14px', marginLeft: '12px', fontWeight: 600 }}>내 프로필</span>}
           </div>
         </div>
 
-      </nav>
+      </aside>
 
-      <main style={{ flex: 1, position: 'relative', overflowY: 'auto' }}>
+      {/* 오른쪽 메인 화면 영역 */}
+      <div className="main-area">
         <Outlet /> 
-      </main>
+      </div>
 
     </div>
   );

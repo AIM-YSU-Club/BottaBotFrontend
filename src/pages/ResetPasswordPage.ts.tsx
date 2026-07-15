@@ -6,13 +6,16 @@ import api from '../api/axios';
 const ResetPasswordPage = () => {
   const navigate = useNavigate();
   
-  // 🚀 주소창의 쿼리 파라미터(?token=...)를 읽어오기 위한 훅
+  // 🚀 주소창의 쿼리 파라미터(?token=...)를 읽어오기 위한 훅 (기능 유지)
   const [searchParams] = useSearchParams();
   const token = searchParams.get('token');
 
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
 
+  // ==========================================
+  // 🚀 기존 통신 및 검증 로직 (100% 유지)
+  // ==========================================
   const handleResetSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -29,8 +32,6 @@ const ResetPasswordPage = () => {
     }
 
     try {
-      // TODO(백엔드): 실제 비밀번호를 변경하는 API (예: POST /api/auth/reset-password/confirm)
-      // 전송(Request) 데이터: { token, newPassword }
       await api.post('/auth/reset-password/confirm', { 
         token, 
         newPassword 
@@ -54,56 +55,74 @@ const ResetPasswordPage = () => {
     }
   };
 
-  // 만약 이메일 링크를 통하지 않고 강제로 주소를 쳐서 들어온 경우 방어
+  // ==========================================
+  // 🎨 예외 화면: 토큰 없이 강제 접근한 경우 (새 디자인 적용)
+  // ==========================================
   if (!token) {
     return (
-      <div style={{ display: 'flex', height: '100vh', backgroundColor: '#131314', justifyContent: 'center', alignItems: 'center', color: '#e3e3e3', flexDirection: 'column', gap: '20px' }}>
-        <h2>잘못된 접근입니다 🚫</h2>
-        <p style={{ color: '#c4c7c5' }}>비밀번호 재설정 이메일의 링크를 통해서만 접근할 수 있습니다.</p>
-        <button onClick={() => navigate('/login')} style={{ padding: '10px 20px', borderRadius: '8px', backgroundColor: '#a8c7fa', color: '#041e49', fontWeight: 'bold', border: 'none', cursor: 'pointer' }}>로그인으로 돌아가기</button>
+      <div className="auth-page">
+        <div className="auth-card" style={{ textAlign: 'center' }}>
+          {/* 에러 느낌을 주기 위해 마스코트를 흑백 처리했습니다 */}
+          <div className="mascot-xl" style={{ filter: 'grayscale(100%)' }}>
+            <span className="eyes"><span></span><span></span></span>
+          </div>
+          <div className="auth-title">BottaBot</div>
+          
+          <div className="auth-heading" style={{ color: 'var(--danger)' }}>잘못된 접근입니다 🚫</div>
+          <div className="auth-sub" style={{ marginBottom: '30px' }}>
+            비밀번호 재설정 이메일의 링크를 통해서만 접근할 수 있습니다.
+          </div>
+          
+          <button type="button" className="btn btn-primary" onClick={() => navigate('/login')}>
+            로그인으로 돌아가기
+          </button>
+        </div>
       </div>
     );
   }
 
+  // ==========================================
+  // 🎨 정상 화면: 비밀번호 재설정 폼 (새 디자인 적용)
+  // ==========================================
   return (
-    <div style={{ display: 'flex', height: '100vh', backgroundColor: '#131314', justifyContent: 'center', alignItems: 'center', color: '#e3e3e3' }}>
-      <div style={{ width: '100%', maxWidth: '400px', padding: '40px', backgroundColor: '#1e1f20', borderRadius: '15px', border: '1px solid #444746', boxShadow: '0 10px 25px rgba(0,0,0,0.5)' }}>
+    <div className="auth-page">
+      <form onSubmit={handleResetSubmit} className="auth-card">
         
-        <h1 style={{ textAlign: 'center', marginBottom: '10px', fontWeight: '500', fontSize: '20px' }}>새 비밀번호 설정</h1>
-        <p style={{ textAlign: 'center', color: '#c4c7c5', fontSize: '13px', marginBottom: '30px' }}>새롭게 사용할 비밀번호를 입력해 주세요.</p>
+        <div className="mascot-xl">
+          <span className="eyes"><span></span><span></span></span>
+        </div>
+        
+        <div className="auth-title">BottaBot</div>
+        <div className="auth-heading">새 비밀번호 설정</div>
+        <div className="auth-sub">새롭게 사용할 비밀번호를 입력해 주세요.</div>
 
-        <form onSubmit={handleResetSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-          
-          <div>
-            <label style={{ display: 'block', marginBottom: '8px', color: '#c4c7c5', fontSize: '14px' }}>새 비밀번호</label>
-            <input 
-              type="password" 
-              placeholder="새 비밀번호 입력" 
-              value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
-              required
-              style={{ width: '100%', padding: '12px', borderRadius: '8px', backgroundColor: '#131314', border: '1px solid #444746', color: 'white', outline: 'none', boxSizing: 'border-box' }} 
-            />
-          </div>
+        <div className="field">
+          <label>새 비밀번호</label>
+          <input 
+            type="password" 
+            placeholder="새 비밀번호 입력" 
+            value={newPassword}
+            onChange={(e) => setNewPassword(e.target.value)}
+            required
+          />
+        </div>
 
-          <div>
-            <label style={{ display: 'block', marginBottom: '8px', color: '#c4c7c5', fontSize: '14px' }}>새 비밀번호 확인</label>
-            <input 
-              type="password" 
-              placeholder="새 비밀번호 다시 입력" 
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              required
-              style={{ width: '100%', padding: '12px', borderRadius: '8px', backgroundColor: '#131314', border: '1px solid #444746', color: 'white', outline: 'none', boxSizing: 'border-box' }} 
-            />
-          </div>
+        <div className="field">
+          <label>새 비밀번호 확인</label>
+          <input 
+            type="password" 
+            placeholder="새 비밀번호 다시 입력" 
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            required
+          />
+        </div>
 
-          <button type="submit" style={{ width: '100%', padding: '12px', borderRadius: '8px', backgroundColor: '#a8c7fa', color: '#041e49', fontWeight: 'bold', border: 'none', cursor: 'pointer', marginTop: '10px' }}>
-            비밀번호 변경하기
-          </button>
-        </form>
+        <button type="submit" className="btn btn-primary" style={{ marginTop: '20px' }}>
+          비밀번호 변경하기
+        </button>
 
-      </div>
+      </form>
     </div>
   );
 };

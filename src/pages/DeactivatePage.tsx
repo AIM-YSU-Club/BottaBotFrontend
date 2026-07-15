@@ -4,133 +4,151 @@ import axios from 'axios';
 import api from '../api/axios';
 
 const DeactivatePage = () => {
-  // 🚀 화면 이동을 담당하는 함수를 가져옵니다.
   const navigate = useNavigate();
   
-  const [withdrawalReason, setWithdrawalReason] = useState('');
-  const [isHardDeleteModalOpen, setIsHardDeleteModalOpen] = useState(false);
+  // 💡 탈퇴 진행 단계를 관리하는 상태 (1: 경고 화면, 2: 정보 입력, 3: 완료 화면)
+  const [step, setStep] = useState<1 | 2 | 3>(1);
+  
+  // 💡 탈퇴 확인을 위한 입력 상태
+  const [password, setPassword] = useState('');
+  const [confirmText, setConfirmText] = useState('');
+
+  // "탈퇴합니다" 문구와 비밀번호가 모두 입력되었는지 확인
+  const isReadyToWithdraw = password.trim().length > 0 && confirmText.trim() === '탈퇴합니다';
 
   // ==========================================
-  // 🚀 1. 비활성화 API (30일 유예 - Soft Delete)
+  // 🚀 백엔드 통신: 실제 회원 탈퇴 로직
   // ==========================================
-  const handleDeactivate = async () => {
-    if (!withdrawalReason) {
-      alert('비활성화 사유를 선택해 주세요.');
-      return;
-    }
+  const handleWithdrawSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!isReadyToWithdraw) return;
 
     try {
-      await api.patch('/user/deactivate', { reason: withdrawalReason });
-      
-      // 기존 출입증(토큰) 파기
+      // 💡 명세서 기준에 맞춰 DELETE 요청 시 비밀번호를 함께 전송합니다.
+      // (백엔드 세팅에 따라 data 객체 안에 넣어서 보냅니다)
+      await api.delete('/members/me', { 
+        data: { password } 
+      });
+
+      // 탈퇴 성공 시: 스토리지 비우고 완료 화면(3단계)으로 이동
       sessionStorage.removeItem('accessToken');
-      
-      alert('계정이 비활성화되었습니다. 30일 이내에 로그인하시면 복구됩니다.');
-      
-      // 🚀 [핵심]: 확인 버튼을 누르는 즉시 로그인 페이지로 튕겨냅니다!
-      navigate('/login'); 
-      
+      sessionStorage.removeItem('refreshToken');
+      setStep(3);
+
     } catch (error: unknown) {
-      console.error('비활성화 에러:', error);
-      if (axios.isAxiosError(error)) alert('처리 중 서버 문제가 발생했습니다.');
-      else alert('알 수 없는 오류가 발생했습니다.');
+      console.error('회원 탈퇴 에러:', error);
+      if (axios.isAxiosError(error)) {
+        if (error.response?.status === 401 || error.response?.status === 403) {
+          alert('비밀번호가 일치하지 않습니다. 다시 확인해 주세요.');
+        } else {
+          alert(`탈퇴 처리 중 오류가 발생했습니다: ${error.response?.data?.error?.message || '알 수 없는 오류'}`);
+        }
+      } else {
+        alert('알 수 없는 오류가 발생했습니다.');
+      }
     }
   };
 
   // ==========================================
-  // 🚀 2. 영구 탈퇴 API (즉시 삭제 - Hard Delete)
+  // 🎨 단계별 화면 렌더링
   // ==========================================
-  const handleHardDelete = async () => {
-    try {
-      await api.delete('/user/account');
-      
-      // 기존 출입증(토큰) 파기
-      sessionStorage.removeItem('accessToken');
-      
-      alert('회원 탈퇴가 완료되었습니다. 그동안 이용해 주셔서 감사합니다.');
-      setIsHardDeleteModalOpen(false);
-      
-      // 🚀 [핵심]: 확인 버튼을 누르는 즉시 로그인 페이지로 튕겨냅니다!
-      navigate('/login'); 
-      
-    } catch (error: unknown) {
-      console.error('영구 탈퇴 에러:', error);
-      if (axios.isAxiosError(error)) alert('처리 중 서버 문제가 발생했습니다.');
-      else alert('알 수 없는 오류가 발생했습니다.');
-    }
-  };
 
-  return (
-    <div style={{ padding: '40px', maxWidth: '600px', margin: '0 auto', color: '#e3e3e3', height: '100%', overflowY: 'auto' }}>
-      
-      <div style={{ animation: 'fadeIn 0.3s ease-out' }}>
-        <h1 style={{ marginBottom: '10px', fontWeight: '400', textAlign: 'center' }}>계정 비활성화</h1>
-        <p style={{ textAlign: 'center', color: '#c4c7c5', fontSize: '14px', marginBottom: '40px' }}>잠시 서비스를 쉬어가고 싶으신가요?</p>
+  // --- 1단계: 탈퇴 경고 안내 화면 ---
+  if (step === 1) {
+    return (
+      <div className="auth-page">
+        <div className="auth-card">
+          <div className="mascot-xl"><span className="eyes"><span></span><span></span></span></div>
+          <div className="auth-title">BottaBot</div>
+          <div className="auth-heading">회원 탈퇴</div>
+          <div className="auth-sub">탈퇴 전 아래 내용을 확인해 주세요</div>
 
-        {/* 1. 비활성화 (Soft Delete) 영역 */}
-        <div style={{ backgroundColor: '#1e1f20', padding: '30px', borderRadius: '15px', border: '1px solid #444746', marginBottom: '40px' }}>
-          <div style={{ backgroundColor: '#303030', padding: '15px', borderRadius: '8px', marginBottom: '25px' }}>
-            <p style={{ margin: 0, fontSize: '14px', lineHeight: '1.6', textAlign: 'center', color: '#e3e3e3' }}>
-              비활성화 시 계정은 즉시 숨김 처리 되며,<br/>
-              <strong>30일 이내에 다시 로그인하시면 데이터가 100% 복구</strong>됩니다.
-            </p>
+          <div className="warning-box">
+            <div className="wtitle">⚠ 탈퇴 시 삭제되는 항목</div>
+            <ul>
+              <li><span className="x">✕</span> 모든 대화 기록 및 프롬프트 노트</li>
+              <li><span className="x">✕</span> 업로드한 문서 및 파일 데이터</li>
+              <li><span className="x">✕</span> 계정 프로필 정보 및 설정</li>
+            </ul>
           </div>
+          <div className="note-center">삭제된 데이터는 절대 복구할 수 없습니다.</div>
 
-          <p style={{ color: '#e3e3e3', fontSize: '15px', marginBottom: '15px', fontWeight: '500' }}>떠나시는 이유를 알려주시면 개선하겠습니다.</p>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '30px' }}>
-            {['쓰지 않는 계정이에요', '원하는 기능이 없어요', '이용 방법이 어려워요', '기타 사유'].map((reason) => (
-              <label key={reason} style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#c4c7c5', cursor: 'pointer', fontSize: '14px' }}>
-                <input type="radio" name="withdrawReason" value={reason} onChange={(e) => setWithdrawalReason(e.target.value)} style={{ cursor: 'pointer' }} />
-                {reason}
-              </label>
-            ))}
-          </div>
-
-          <button 
-            onClick={handleDeactivate} 
-            disabled={!withdrawalReason} 
-            style={{ width: '100%', padding: '12px', borderRadius: '8px', fontWeight: 'bold', border: 'none', backgroundColor: withdrawalReason ? '#f28b82' : '#303030', color: withdrawalReason ? '#3f0f0a' : '#7a7c7f', cursor: withdrawalReason ? 'pointer' : 'not-allowed', transition: 'background-color 0.2s' }}
-          >
-            계정 비활성화하기
+          <button type="button" className="btn btn-danger ready" onClick={() => setStep(2)}>
+            탈퇴 진행하기
           </button>
-        </div>
-
-        <hr style={{ borderColor: '#444746', margin: '40px 0', borderTop: 'none' }} />
-
-        {/* 2. 진짜 영구 탈퇴 (Hard Delete) 영역 */}
-        <div style={{ textAlign: 'center', marginTop: '40px' }}>
-          <h3 style={{ color: '#f28b82', margin: '0 0 10px 0', fontWeight: '500' }}>영구 탈퇴</h3>
-          <p style={{ color: '#7a7c7f', fontSize: '13px', marginBottom: '20px', lineHeight: '1.5' }}>
-            비활성화 유예 기간 없이 즉시 모든 데이터를 영구적으로 삭제하고 떠나시려면<br/>아래 버튼을 눌러주세요. 이 작업은 절대 되돌릴 수 없습니다.
-          </p>
-          <button 
-            onClick={() => setIsHardDeleteModalOpen(true)}
-            style={{ padding: '8px 16px', background: 'transparent', border: 'none', color: '#f28b82', textDecoration: 'underline', cursor: 'pointer', fontSize: '14px' }}
-          >
-            회원 탈퇴 진행하기
+          <button type="button" className="btn btn-outline" onClick={() => navigate('/profile')}>
+            취소하고 돌아가기
           </button>
-        </div>
-
-        <div style={{ textAlign: 'center', marginTop: '40px' }}>
-          <span onClick={() => navigate('/profile')} style={{ color: '#a8c7fa', cursor: 'pointer', fontSize: '14px' }}>← 이전 페이지로 돌아가기</span>
         </div>
       </div>
+    );
+  }
 
-      {/* 🚨 영구 탈퇴 최종 경고 모달창 */}
-      {isHardDeleteModalOpen && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0, 0, 0, 0.8)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 100 }}>
-          <div style={{ backgroundColor: '#1e1f20', padding: '30px', borderRadius: '15px', width: '400px', border: '1px solid #f28b82', textAlign: 'center' }}>
-            <h2 style={{ marginTop: 0, color: '#f28b82', fontSize: '20px' }}>정말 영구 탈퇴하시겠습니까?</h2>
-            <p style={{ color: '#c4c7c5', fontSize: '14px', lineHeight: '1.6', marginBottom: '30px' }}>
-              지금 탈퇴하시면 저장된 모든 노트북과 대화 내역이 <strong>즉시 삭제</strong>되며, 절대 복구할 수 없습니다.
-            </p>
-            <div style={{ display: 'flex', gap: '10px' }}>
-              <button onClick={() => setIsHardDeleteModalOpen(false)} style={{ flex: 1, padding: '12px', borderRadius: '8px', backgroundColor: 'transparent', color: '#e3e3e3', border: '1px solid #c4c7c5', cursor: 'pointer' }}>취소</button>
-              <button onClick={handleHardDelete} style={{ flex: 1, padding: '12px', borderRadius: '8px', backgroundColor: '#f28b82', color: '#3f0f0a', fontWeight: 'bold', border: 'none', cursor: 'pointer' }}>영구 탈퇴하기</button>
-            </div>
+  // --- 2단계: 비밀번호 및 확인 문구 입력 화면 ---
+  if (step === 2) {
+    return (
+      <div className="auth-page">
+        <form onSubmit={handleWithdrawSubmit} className="auth-card">
+          <div className="mascot-xl"><span className="eyes"><span></span><span></span></span></div>
+          <div className="auth-title">BottaBot</div>
+          <div className="auth-heading">회원 탈퇴 확인</div>
+          <div className="auth-sub">안전한 처리를 위해 정보를 입력해 주세요</div>
+
+          <div className="field">
+            <label>비밀번호 확인</label>
+            <input 
+              type="password" 
+              placeholder="현재 비밀번호 입력" 
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+            />
           </div>
-        </div>
-      )}
+          
+          <div className="field">
+            <label>아래에 <span style={{ color: 'var(--danger)' }}>"탈퇴합니다"</span>를 정확히 입력해 주세요</label>
+            <input 
+              type="text" 
+              placeholder="탈퇴합니다" 
+              value={confirmText}
+              onChange={(e) => setConfirmText(e.target.value)}
+              required
+            />
+          </div>
+
+          {/* 조건이 충족되어야만 버튼 색상이 빨갛게 활성화(ready) 됩니다 */}
+          <button 
+            type="submit" 
+            className={`btn ${isReadyToWithdraw ? 'btn-danger ready' : 'btn-danger'}`} 
+            disabled={!isReadyToWithdraw}
+            style={{ opacity: isReadyToWithdraw ? 1 : 0.5 }}
+          >
+            최종 탈퇴
+          </button>
+          <button type="button" className="btn btn-outline" onClick={() => setStep(1)}>
+            ← 이전 단계로
+          </button>
+        </form>
+      </div>
+    );
+  }
+
+  // --- 3단계: 탈퇴 완료 화면 ---
+  return (
+    <div className="auth-page">
+      <div className="auth-card" style={{ textAlign: 'center' }}>
+        {/* 마스코트를 흑백으로 처리하여 이별의 느낌(?)을 줍니다 */}
+        <div className="mascot-xl" style={{ filter: 'grayscale(100%)' }}><span className="eyes"><span></span><span></span></span></div>
+        <div className="auth-title">BottaBot</div>
+        
+        <div className="done-emoji">👋</div>
+        <div className="done-title">탈퇴가 완료되었습니다</div>
+        <div className="done-sub">그동안 BottaBot을 이용해 주셔서 진심으로 감사드립니다.<br/>언제든 다시 돌아오세요!</div>
+
+        <button type="button" className="btn btn-primary" onClick={() => navigate('/login')}>
+          처음 화면으로
+        </button>
+      </div>
     </div>
   );
 };

@@ -11,6 +11,9 @@ const FindAccountPage = () => {
   const [studentId, setStudentId] = useState('');
   const [email, setEmail] = useState('');
 
+  // ==========================================
+  // 🚀 기존 통신 로직 및 에러 처리 (100% 유지)
+  // ==========================================
   const handleFindId = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name || !studentId) return;
@@ -59,54 +62,98 @@ const FindAccountPage = () => {
     }
   };
 
+  // ==========================================
+  // 🎨 화면(UI) 부분만 새 디자인 클래스로 완벽 교체
+  // ==========================================
   return (
-    <div style={{ display: 'flex', height: '100vh', backgroundColor: '#131314', justifyContent: 'center', alignItems: 'center', color: '#e3e3e3' }}>
-      <div style={{ width: '100%', maxWidth: '400px', padding: '40px', backgroundColor: '#1e1f20', borderRadius: '15px', border: '1px solid #444746', boxShadow: '0 10px 25px rgba(0,0,0,0.5)' }}>
+    <div className="auth-page">
+      <div className="auth-card">
         
-        <h1 style={{ textAlign: 'center', marginBottom: '20px', fontWeight: '500', fontSize: '20px' }}>계정 찾기</h1>
+        {/* 새 디자인: 마스코트 */}
+        <div className="mascot-xl">
+          <span className="eyes"><span></span><span></span></span>
+        </div>
+        
+        <div className="auth-title">BottaBot</div>
+        
+        {/* 탭 상태에 따라 제목과 설명이 자연스럽게 바뀝니다 */}
+        <div className="auth-heading">
+          {activeTab === 'findId' ? '계정 찾기' : '비밀번호 재설정'}
+        </div>
+        <div className="auth-sub">
+          {activeTab === 'findId' 
+            ? '가입 시 사용한 이메일로 찾을 수 있어요'
+            : '가입한 이메일을 입력하면 재설정 링크를 보내드려요'}
+        </div>
 
-        <div style={{ display: 'flex', marginBottom: '30px', borderBottom: '1px solid #444746' }}>
+        {/* 🎨 새 디자인: 탭 UI 적용 (.segment) */}
+        <div className="segment">
           <button 
+            type="button" 
+            className={activeTab === 'findId' ? 'active' : ''} 
             onClick={() => setActiveTab('findId')}
-            type="button"
-            style={{ flex: 1, padding: '10px', background: 'transparent', border: 'none', borderBottom: activeTab === 'findId' ? '2px solid #a8c7fa' : 'none', color: activeTab === 'findId' ? '#a8c7fa' : '#c4c7c5', cursor: 'pointer', fontWeight: activeTab === 'findId' ? 'bold' : 'normal' }}
           >
             아이디 찾기
           </button>
           <button 
+            type="button" 
+            className={activeTab === 'resetPw' ? 'active' : ''} 
             onClick={() => setActiveTab('resetPw')}
-            type="button"
-            style={{ flex: 1, padding: '10px', background: 'transparent', border: 'none', borderBottom: activeTab === 'resetPw' ? '2px solid #a8c7fa' : 'none', color: activeTab === 'resetPw' ? '#a8c7fa' : '#c4c7c5', cursor: 'pointer', fontWeight: activeTab === 'resetPw' ? 'bold' : 'normal' }}
           >
-            비밀번호 재설정
+            비밀번호 찾기
           </button>
         </div>
 
+        {/* 선택된 탭에 따라 폼을 렌더링 */}
         {activeTab === 'findId' ? (
-          <form onSubmit={handleFindId} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-            <div>
-              <label style={{ display: 'block', marginBottom: '8px', color: '#c4c7c5', fontSize: '14px' }}>가입 시 등록한 이름</label>
-              <input type="text" placeholder="홍길동" value={name} onChange={(e) => setName(e.target.value)} required style={{ width: '100%', padding: '12px', borderRadius: '8px', backgroundColor: '#131314', border: '1px solid #444746', color: 'white', outline: 'none', boxSizing: 'border-box' }} />
+          <form onSubmit={handleFindId}>
+            <div className="field">
+              <label>가입 시 등록한 이름</label>
+              <input 
+                type="text" 
+                placeholder="홍길동" 
+                value={name} 
+                onChange={(e) => setName(e.target.value)} 
+                required 
+              />
             </div>
-            <div>
-              <label style={{ display: 'block', marginBottom: '8px', color: '#c4c7c5', fontSize: '14px' }}>학번</label>
-              <input type="text" placeholder="20240001" value={studentId} onChange={(e) => setStudentId(e.target.value)} required style={{ width: '100%', padding: '12px', borderRadius: '8px', backgroundColor: '#131314', border: '1px solid #444746', color: 'white', outline: 'none', boxSizing: 'border-box' }} />
+            <div className="field">
+              <label>학번</label>
+              <input 
+                type="text" 
+                placeholder="20240001" 
+                value={studentId} 
+                onChange={(e) => setStudentId(e.target.value)} 
+                required 
+              />
             </div>
-            <button type="submit" style={{ width: '100%', padding: '12px', borderRadius: '8px', backgroundColor: '#a8c7fa', color: '#041e49', fontWeight: 'bold', border: 'none', cursor: 'pointer', marginTop: '10px' }}>아이디 찾기</button>
+            <button type="submit" className="btn btn-primary">
+              아이디 찾기
+            </button>
           </form>
         ) : (
-          <form onSubmit={handleResetPw} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-            <div>
-              <label style={{ display: 'block', marginBottom: '8px', color: '#c4c7c5', fontSize: '14px' }}>가입한 이메일 (아이디)</label>
-              <input type="email" placeholder="example@univ.ac.kr" value={email} onChange={(e) => setEmail(e.target.value)} required style={{ width: '100%', padding: '12px', borderRadius: '8px', backgroundColor: '#131314', border: '1px solid #444746', color: 'white', outline: 'none', boxSizing: 'border-box' }} />
+          <form onSubmit={handleResetPw}>
+            <div className="field">
+              <label>가입한 이메일 (아이디)</label>
+              <input 
+                type="email" 
+                placeholder="example@yeonsung.ac.kr" 
+                value={email} 
+                onChange={(e) => setEmail(e.target.value)} 
+                required 
+              />
             </div>
-            <button type="submit" style={{ width: '100%', padding: '12px', borderRadius: '8px', backgroundColor: '#a8c7fa', color: '#041e49', fontWeight: 'bold', border: 'none', cursor: 'pointer', marginTop: '10px' }}>재설정 링크 받기</button>
+            <button type="submit" className="btn btn-primary">
+              재설정 링크 받기
+            </button>
           </form>
         )}
 
-        <div style={{ textAlign: 'center', marginTop: '20px' }}>
-          <span onClick={() => navigate('/login')} style={{ color: '#c4c7c5', cursor: 'pointer', fontSize: '14px', textDecoration: 'underline' }}>로그인으로 돌아가기</span>
-        </div>
+        {/* 하단 로그인 돌아가기 링크 */}
+        <a className="link-back" onClick={() => navigate('/login')} style={{ cursor: 'pointer' }}>
+          ← 로그인으로 돌아가기
+        </a>
+        
       </div>
     </div>
   );
