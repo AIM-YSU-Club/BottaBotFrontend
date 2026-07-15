@@ -2,7 +2,7 @@ import axios from 'axios';
 
 // 1. 명세서에 지정된 기본 API 주소 설정
 const api = axios.create({
-  baseURL: 'http://localhost:8000/api/v1',
+  baseURL: import.meta.env.VITE_API_BASE_URL,
   headers: {
     'Content-Type': 'application/json',
   },
