@@ -1,34 +1,38 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-
-// 🚀 [가져오기]: 기존에 만드신 페이지와 레이아웃들을 불러옵니다.
-import MainLayout from './components/layout/MainLatyout';
+import MainLayout from './components/layout/MainLayout'; // (오타 수정됨)
 import HomePage from './pages/HomePage';
 import LoginPage from './pages/LoginPage';
-import SignUpPage from './pages/SignUpPage';
+import SignUpPage from './pages/SignUpPage'; // 📌 누락 복구
 import FindAccountPage from './pages/FindAccountPage';
-import ResetPasswordPage from './pages/ResetPasswordPage.ts'; // 🚀 [추가됨]: 비밀번호 재설정 페이지 가져오기
 import ProfilePage from './pages/ProfilePage';
 import DeactivatePage from './pages/DeactivatePage';
-import ChangeIdPage from './pages/ChangeIdPage';
+import ChangeIdPage from './pages/ChangeIdPage'; // 📌 MainLayout 내부로 이동
+import SettingPage from './pages/SettingPage'; // 📌 이름(단수형) 복구
+import NotebookPage from './pages/NotebookPage';
 
 // ==========================================
-// 🚀 [핵심 로직]: 인증 검문소 (Protected Route) 만들기
+// 🚀 [핵심 로직]: 인증 검문소 (Protected Route)
 // ==========================================
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
-  // 세션 스토리지에 출입증(accessToken)이 있는지 검사합니다.
   const isAuthenticated = !!sessionStorage.getItem('accessToken');
 
-  // 출입증이 없다면? -> 로그인 페이지('/login')로 쫓아냅니다!
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
   }
 
-  // 출입증이 있다면? -> 원래 가려던 페이지(children)를 그대로 보여줍니다.
   return <>{children}</>;
 };
 
 const App = () => {
+
+  useEffect(() => {
+    const savedTheme = localStorage.getItem('theme');
+    if (savedTheme === 'dark') {
+      document.body.classList.add('dark');
+    }
+  }, []);
+
   return (
     <BrowserRouter>
       <Routes>
@@ -38,9 +42,6 @@ const App = () => {
         <Route path="/login" element={<LoginPage />} />
         <Route path="/signup" element={<SignUpPage />} />
         <Route path="/find-account" element={<FindAccountPage />} />
-        
-        {/* 🚀 [추가됨]: 비밀번호 재설정 페이지는 로그인 없이 접근해야 하므로 공개 구역에 넣습니다! */}
-        <Route path="/reset-password" element={<ResetPasswordPage />} />
 
         {/* ========================================== */}
         {/* 🔒 2. 로그인 필수 구역 (Protected Routes) */}
@@ -53,15 +54,15 @@ const App = () => {
             </ProtectedRoute>
           } />
 
+          <Route path="/notebook/:id" element={
+            <ProtectedRoute>
+              <NotebookPage />
+            </ProtectedRoute>
+          } />
+
           <Route path="/profile" element={
             <ProtectedRoute>
               <ProfilePage />
-            </ProtectedRoute>
-          } />
-          
-          <Route path="/deactivate" element={
-            <ProtectedRoute>
-              <DeactivatePage />
             </ProtectedRoute>
           } />
           
@@ -71,7 +72,23 @@ const App = () => {
             </ProtectedRoute>
           } />
 
+          {/* 📌 /settings 로 경로명 통일 및 복구 */}
+          <Route path="/settings" element={
+            <ProtectedRoute>
+              <SettingPage />
+            </ProtectedRoute>
+          } />
+
+          <Route path="/deactivate" element={
+            <ProtectedRoute>
+              <DeactivatePage />
+            </ProtectedRoute>
+          } />
+
         </Route>
+
+        {/* 🚨 잘못된 주소로 가면 무조건 로비(홈)로 튕겨내기 */}
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
   );
