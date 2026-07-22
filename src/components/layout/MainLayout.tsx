@@ -1,11 +1,15 @@
 import React, { useState } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
+import { useUser } from '../../context/UserContext'; // 🚀 1. 플러그 불러오기!
 
 const MainLayout = () => {
   const navigate = useNavigate();
   const location = useLocation(); 
   
   const [isSidebarOpen, setIsSidebarOpen] = useState(false); 
+
+  // 🚀 2. 전역 발전소에서 내 정보(user) 꺼내기
+  const { user } = useUser(); 
 
   // 🚀 기존 기능 및 디자인 100% 유지 (SVG 아이콘 완벽 적용)
   const menuItems = [
@@ -141,7 +145,8 @@ const MainLayout = () => {
             }}
           >
             <div className="avatar" style={{ width: '28px', height: '28px', fontSize: '11px', flex: 'none' }}>
-              범준
+              {/* 🚀 3. 하드코딩된 '범준' 대신 전역 상태의 이름을 띄워줍니다! */}
+              {user.name} 
             </div>
             {isSidebarOpen && <span style={{ fontSize: '14px', marginLeft: '12px', fontWeight: 600 }}>내 프로필</span>}
           </div>
