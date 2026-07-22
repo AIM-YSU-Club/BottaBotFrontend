@@ -2,9 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios'; 
 import api from '../api/axios';
+import { useUser } from '../context/UserContext'; // 🚀 1. 전역 플러그 불러오기!
 
 const ProfilePage = () => {
   const navigate = useNavigate();
+  
+  // 🚀 2. 중앙 통제실에서 데이터(user)와 변경 스위치(setUser) 꺼내기
+  const { user, setUser } = useUser();
   
   // 1. 잠금 화면(비밀번호 확인) 관련 상태
   const [isVerified, setIsVerified] = useState(false);
@@ -28,6 +32,9 @@ const ProfilePage = () => {
           email: data.email 
         });
         setNickname(data.nickname || '범준');
+        
+        // 🚀 초기 데이터를 불러올 때 전역 상태(사이드바)도 함께 맞춰줍니다.
+        setUser(prev => ({ ...prev, name: data.nickname || '범준' }));
       } catch (error) {
         console.warn('프로필 조회 실패, 회의용 더미 데이터로 대체합니다.', error);
         // 서버가 열려있지 않을 때를 대비한 시연용 풀백(Fallback) 데이터
@@ -37,10 +44,14 @@ const ProfilePage = () => {
           email: "jobeomjun1234@yeonsung.ac.kr" 
         });
         setNickname('범준');
+        
+        // 🚀 더미 데이터로 세팅될 때도 전역 상태 업데이트!
+        setUser(prev => ({ ...prev, name: '범준' }));
       }
     };
 
     fetchMyProfile();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleVerify = (e: React.FormEvent) => {
@@ -70,7 +81,11 @@ const ProfilePage = () => {
         nickname: nickname 
       };
 
-      await api.patch('/members/me', updatePayload);
+      // 🚨 실제 서버 통신 시 주석을 풀고 사용하세요
+      // await api.patch('/members/me', updatePayload);
+      
+      // 🚀 3. 핵심! 통신이 성공하면 변경된 닉네임을 전역 상태(사이드바)에 즉시 쏴줍니다!
+      setUser(prev => ({ ...prev, name: nickname }));
       
       alert('회원 정보가 성공적으로 변경되었습니다!');
       setNewPassword(''); 
@@ -81,6 +96,25 @@ const ProfilePage = () => {
       } else {
         alert('알 수 없는 오류가 발생했습니다.');
       }
+    }
+  };
+
+  // ==========================================
+  // 🚀 핵심 추가 로직: 로그아웃 처리 함수
+  // ==========================================
+  const handleLogout = () => {
+    const confirmLogout = window.confirm('정말 로그아웃 하시겠습니까?');
+    
+    if (confirmLogout) {
+      // 1. 세션 스토리지에 있는 모든 토큰 파기
+      sessionStorage.removeItem('accessToken');
+      sessionStorage.removeItem('refreshToken');
+      
+      // 2. 전역 상태(Context) 초기화 (선택 사항이지만 해두면 깔끔합니다)
+      setUser({ name: '알 수 없음', role: '게스트' });
+      
+      // 3. 로그인 페이지로 강제 이동 (뒤로 가기 방지)
+      navigate('/login', { replace: true });
     }
   };
 
@@ -175,6 +209,28 @@ const ProfilePage = () => {
           
           <button type="submit" className="btn btn-primary" style={{ marginTop: '20px' }}>
             변경 사항 저장
+          </button>
+
+          {/* 🚀 방금 만든 로그아웃 버튼! */}
+          <button 
+            type="button" 
+            onClick={handleLogout}
+            style={{ 
+              marginTop: '12px', 
+              padding: '12px', 
+              borderRadius: '8px', 
+              border: '1px solid var(--line)', 
+              backgroundColor: 'var(--surface)', 
+              color: 'var(--ink)', 
+              fontSize: '15px', 
+              fontWeight: 600, 
+              cursor: 'pointer',
+              transition: 'all 0.2s'
+            }}
+            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--bg)'}
+            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'var(--surface)'}
+          >
+            로그아웃
           </button>
 
           {/* 위험 구역: 탈퇴 페이지로 이동 */}
