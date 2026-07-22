@@ -76,18 +76,75 @@ const NotebookPage = () => {
     fileInputRef.current?.click();
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // ==========================================
+  // 📦 파일이 선택되었을 때 처리 (진짜 FormData 통신 로직)
+  // ==========================================
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
-    if (files && files.length > 0) {
-      const names = Array.from(files).map(f => f.name).join(', ');
-      const newHistory: ChatHistory = {
-        id: Date.now(),
-        tag: '문서 업로드',
-        time: getNowLabel(),
-        summary: `📎 파일 첨부: ${names}`,
-        msgCount: 1
-      };
-      setHistories([newHistory, ...histories]);
+    if (!files || files.length === 0) return;
+
+    const names = Array.from(files).map(f => f.name).join(', ');
+    
+    // 1. UX 향상: 화면에 먼저 "⏳ 업로드 중..." 카드를 띄워줍니다.
+    const tempId = Date.now();
+    const uploadingHistory: ChatHistory = {
+      id: tempId,
+      tag: '문서 업로드',
+      time: getNowLabel(),
+      summary: `⏳ 업로드 중...: ${names}`,
+      msgCount: 0
+    };
+    
+    // 기존 대화 기록 맨 앞에 임시 카드 추가
+    setHistories(prev => [uploadingHistory, ...prev]);
+
+    // 2. 📦 백엔드로 보낼 택배 상자(FormData) 포장하기
+    const formData = new FormData();
+    Array.from(files).forEach((file) => {
+      // 'documents'라는 키값으로 파일을 상자에 넣습니다. (나중에 백엔드 명세서에 맞춰 이름 변경 가능!)
+      formData.append('documents', file); 
+    });
+
+    try {
+      // ==========================================
+      // 🚀 실제 서버 연동 시 아래 주석을 풀어주시면 됩니다!
+      // ==========================================
+      /*
+      const token = sessionStorage.getItem('accessToken');
+      
+      // 파라미터로 받은 노트북 id를 주소에 넣어 해당 방으로 파일을 보냅니다.
+      const response = await fetch(`http://localhost:8080/api/notebook/${id}/upload`, {
+        method: 'POST',
+        headers: {
+          // 💡 꿀팁: FormData를 보낼 때는 'Content-Type'을 안 적는 것이 규칙입니다! (브라우저가 알아서 Boundary 설정)
+          'Authorization': `Bearer ${token}`
+        },
+        body: formData
+      });
+
+      if (!response.ok) throw new Error('업로드 서버 에러');
+      // const data = await response.json(); 
+      */
+
+      // ⏳ 현재는 백엔드 서버가 켜져 있지 않으므로 1.5초 동안 통신하는 척(시뮬레이션) 대기합니다.
+      await new Promise(resolve => setTimeout(resolve, 1500));
+
+      // 3. 통신이 완료되면 '업로드 중' 카드를 '✅ 완료' 상태로 싹 바꿔줍니다.
+      setHistories(prev => prev.map(history => 
+        history.id === tempId 
+          ? { ...history, summary: `✅ 파일 업로드 완료: ${names}`, msgCount: 1 }
+          : history
+      ));
+
+    } catch (error) {
+      console.error("파일 전송 실패:", error);
+      
+      // 에러 발생 시 '❌ 실패' 상태로 변경
+      setHistories(prev => prev.map(history => 
+        history.id === tempId 
+          ? { ...history, summary: `❌ 업로드 실패: ${names}` }
+          : history
+      ));
     }
   };
 
