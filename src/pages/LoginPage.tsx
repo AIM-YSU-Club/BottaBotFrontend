@@ -26,15 +26,15 @@ const LoginPage = () => {
     }
 
     try {
+      console.log('로그인 요청 데이터:', { email, hashedPass: password });
+
       const data = await api.post('/auth/login', {
-        email,
-        password,
-        rememberMe,
+        "email": email,
+        "hashedPass": password
       });
 
-      if (data && data.accessToken && data.refreshToken) {
-        sessionStorage.setItem('accessToken', data.accessToken);
-        sessionStorage.setItem('refreshToken', data.refreshToken);
+      if (data && data.token) {
+        sessionStorage.setItem('accessToken', data.token);
 
         alert('로그인에 성공했습니다!');
         navigate('/');
