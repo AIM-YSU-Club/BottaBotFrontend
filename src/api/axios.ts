@@ -1,4 +1,5 @@
-import axios, { InternalAxiosRequestConfig } from 'axios';
+import axios from 'axios';
+import type { InternalAxiosRequestConfig } from 'axios';
 
 // 🚀 2번 해결: TypeScript 에러 방지를 위해 기존 Axios 설정 타입에 _retry 속성 추가
 interface CustomAxiosRequestConfig extends InternalAxiosRequestConfig {
