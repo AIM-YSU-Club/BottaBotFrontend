@@ -1,4 +1,3 @@
-import { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import MainLayout from './components/layout/MainLayout';
 import HomePage from './pages/HomePage';
@@ -10,17 +9,11 @@ import DeactivatePage from './pages/DeactivatePage';
 import ChangeIdPage from './pages/ChangeIdPage';
 import SettingPage from './pages/SettingPage';
 import NotebookPage from './pages/NotebookPage';
+import LibraryPage from './pages/LibraryPage';
 import { UserProvider } from './context/UserContext';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 
 const App = () => {
-  useEffect(() => {
-    const savedTheme = localStorage.getItem('theme');
-    if (savedTheme === 'dark') {
-      document.body.classList.add('dark');
-    }
-  }, []);
-
   return (
     <UserProvider>
       <BrowserRouter>
@@ -28,6 +21,16 @@ const App = () => {
           <Route path="/login" element={<LoginPage />} />
           <Route path="/signup" element={<SignUpPage />} />
           <Route path="/find-account" element={<FindAccountPage />} />
+
+          {/* 사이드바 없이 전체 화면으로 여는 페이지 (NotebookLM 스타일 3분할 캔버스) */}
+          <Route
+            path="/notebook/:id"
+            element={
+              <ProtectedRoute>
+                <NotebookPage />
+              </ProtectedRoute>
+            }
+          />
 
           <Route element={<MainLayout />}>
             <Route
@@ -40,10 +43,10 @@ const App = () => {
             />
 
             <Route
-              path="/notebook/:id"
+              path="/library/:id"
               element={
                 <ProtectedRoute>
-                  <NotebookPage />
+                  <LibraryPage />
                 </ProtectedRoute>
               }
             />
