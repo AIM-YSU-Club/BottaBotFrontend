@@ -31,18 +31,6 @@ const menuItems = [
     path: '/',
   },
   {
-    id: 'memo',
-    icon: (
-      <svg viewBox="0 0 24 24">
-        <path d="M6 3h9l5 5v13a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z" />
-        <path d="M14 3v5h5" />
-        <path d="M8 13h8M8 17h5" />
-      </svg>
-    ),
-    label: '프롬프트 노트',
-    path: '/',
-  },
-  {
     id: 'chat',
     icon: (
       <svg viewBox="0 0 24 24">
@@ -61,17 +49,6 @@ const menuItems = [
       </svg>
     ),
     label: '라이브러리',
-    path: '/',
-  },
-  {
-    id: 'notice',
-    icon: (
-      <svg viewBox="0 0 24 24">
-        <path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
-        <path d="M13.7 21a2 2 0 0 1-3.4 0" />
-      </svg>
-    ),
-    label: '알림',
     path: '/',
   },
 ];
