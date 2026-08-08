@@ -22,8 +22,9 @@ const DeactivatePage = () => {
     if (!isReadyToWithdraw) return;
 
     try {
+      // API 명세 2장(MEM04_DROP01): DELETE /members/me { password, confirmWithdraw: true }
       await api.delete('/members/me', {
-        data: { password },
+        data: { password, confirmWithdraw: true },
       });
 
       sessionStorage.removeItem('accessToken');

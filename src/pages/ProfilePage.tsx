@@ -67,6 +67,13 @@ const ProfilePage = () => {
     }
 
     try {
+      // API 명세 2장(MEM03_MODIFY01): PATCH /members/me { currentPassword, email/phoneNumber/address/newPassword 중 선택 }
+      // 닉네임은 명세에 없는 필드라 서버로 보내지 않습니다(로컬 표시용). 비밀번호를 바꿀 때만
+      // 실제로 API를 호출하고, 닉네임만 바꾼 경우는 서버에 보낼 게 없어 로컬 상태만 갱신합니다.
+      if (newPassword.trim()) {
+        await api.patch('/members/me', { currentPassword, newPassword: newPassword.trim() });
+      }
+
       setUser((prev) => ({ ...prev, name: nickname }));
 
       alert('회원 정보가 성공적으로 변경되었습니다!');
@@ -83,10 +90,16 @@ const ProfilePage = () => {
     }
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     const confirmLogout = window.confirm('정말 로그아웃 하시겠습니까?');
+    if (!confirmLogout) return;
 
-    if (confirmLogout) {
+    try {
+      // API 명세 2장(MEM05_LOGOUT01): POST /auth/logout — 서버 측 세션/토큰 즉시 만료
+      await api.post('/auth/logout');
+    } catch (error) {
+      console.error('로그아웃 API 실패, 로컬 세션만 정리합니다:', error);
+    } finally {
       sessionStorage.removeItem('accessToken');
       sessionStorage.removeItem('refreshToken');
       setUser({ name: '알 수 없음', role: '게스트' });

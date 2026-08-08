@@ -26,17 +26,20 @@ const LoginPage = () => {
     }
 
     try {
-      console.log('로그인 요청 데이터:', { email, hashedPass: password });
-
+      // API 명세 2장(MEM01_LOGIN_N01): POST /auth/login { email, password, rememberMe }
+      // → { accessToken, refreshToken, member 요약 }
       const data = await api.post('/auth/login', {
-        "email": email,
-        "hashedPass": password
+        email,
+        password,
+        rememberMe,
       });
 
-      if (data && data.token) {
-        sessionStorage.setItem('accessToken', data.token);
+      if (data && data.accessToken) {
+        sessionStorage.setItem('accessToken', data.accessToken);
+        if (data.refreshToken) {
+          sessionStorage.setItem('refreshToken', data.refreshToken);
+        }
 
-        alert('로그인에 성공했습니다!');
         navigate('/');
       } else {
         alert('로그인 처리 중 문제가 발생했습니다. 응답 데이터를 확인해 주세요.');
