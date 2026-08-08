@@ -49,7 +49,7 @@ const menuItems = [
       </svg>
     ),
     label: '라이브러리',
-    path: '/',
+    path: '/library',
   },
 ];
 

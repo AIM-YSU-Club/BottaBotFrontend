@@ -1,236 +1,131 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import Mascot from '../components/common/Mascot';
 import LoadingSpinner from '../components/common/LoadingSpinner';
-import BrandBlock from '../components/notebook/BrandBlock';
-import SectionHead from '../components/notebook/SectionHead';
-import HistoryCard from '../components/notebook/HistoryCard';
-import AddCard from '../components/notebook/AddCard';
-import ChatComposer from '../components/notebook/ChatComposer';
+import { listAllSources, type SourceType, type SourceWithNotebook } from '../utils/notebookStore';
 
-interface ChatHistory {
-  id: number;
-  tag: string;
-  time: string;
-  summary: string;
-  msgCount: number;
-}
+const TYPE_LABEL: Record<SourceType, string> = {
+  FILE_PDF: 'PDF',
+  FILE_DOCX: 'DOCX',
+  FILE_TXT: 'TXT',
+  FILE_PPTX: 'PPTX',
+  FILE_XLSX: 'XLSX',
+  URL: '웹사이트',
+  TEXT: '텍스트',
+};
+
+const STATUS_LABEL: Record<SourceWithNotebook['status'], string> = {
+  PENDING: '대기',
+  PROCESSING: '처리 중',
+  DONE: '완료',
+  ERROR: '오류',
+};
+
+const FILTERS: { label: string; match: (type: SourceType) => boolean }[] = [
+  { label: '전체', match: () => true },
+  { label: '파일', match: (t) => t.startsWith('FILE_') },
+  { label: '웹사이트', match: (t) => t === 'URL' },
+  { label: '텍스트', match: (t) => t === 'TEXT' },
+];
 
 const LibraryPage = () => {
-  const { id } = useParams();
   const navigate = useNavigate();
+  const [keyword, setKeyword] = useState('');
+  const [filterIndex, setFilterIndex] = useState(0);
 
-  const [msgInput, setMsgInput] = useState('');
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  // 모든 노트북의 소스를 한 곳에서 모아보는 페이지. 전체 소스 목록 API가 명세에 없어서
+  // 노트북 목록 → 각 노트북 상세를 조회해 펼칩니다 (notebookStore.ts의 listAllSources 참고).
+  const [allSources, setAllSources] = useState<SourceWithNotebook[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  const [histories, setHistories] = useState<ChatHistory[]>([
-    {
-      id: 1,
-      tag: '문서 분석',
-      time: '오늘 오전 10:24',
-      summary:
-        '업로드한 데이터베이스 설계 PDF를 요약해달라고 요청했고, ERD 정규화 관련 질문을 이어서 물어봤어요.',
-      msgCount: 8,
-    },
-    {
-      id: 2,
-      tag: '일반 질문',
-      time: '어제 오후 6:47',
-      summary:
-        'JetPack 설치 중 발생한 오류에 대해 물어보고, WSL2 Docker 연동 관련 해결 방법을 안내받았어요.',
-      msgCount: 5,
-    },
-  ]);
-
   useEffect(() => {
-    setIsLoading(true);
+    listAllSources()
+      .then(setAllSources)
+      .catch((error) => console.error('소스 목록 조회 실패:', error))
+      .finally(() => setIsLoading(false));
+  }, []);
 
-    const timer = setTimeout(() => {
-      setIsLoading(false);
-    }, 800);
+  const filtered = allSources.filter((s) => {
+    if (!FILTERS[filterIndex].match(s.type)) return false;
+    if (!keyword.trim()) return true;
+    const k = keyword.trim().toLowerCase();
+    return s.name.toLowerCase().includes(k) || s.notebookTitle.toLowerCase().includes(k);
+  });
 
-    return () => clearTimeout(timer);
-  }, [id]);
-
-  const getNowLabel = () => {
-    const d = new Date();
-    let h = d.getHours();
-    const m = d.getMinutes().toString().padStart(2, '0');
-    const ampm = h < 12 ? '오전' : '오후';
-    h = h % 12 || 12;
-    return `오늘 ${ampm} ${h}:${m}`;
-  };
-
-  const handleChatSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!msgInput.trim()) return;
-
-    const newHistory: ChatHistory = {
-      id: Date.now(),
-      tag: '새 대화',
-      time: getNowLabel(),
-      summary: msgInput.trim(),
-      msgCount: 1,
-    };
-    setHistories([newHistory, ...histories]);
-    setMsgInput('');
-  };
-
-  const handleUploadClick = () => {
-    fileInputRef.current?.click();
-  };
-
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
-
-    const names = Array.from(files)
-      .map((f) => f.name)
-      .join(', ');
-
-    const tempId = Date.now();
-    const uploadingHistory: ChatHistory = {
-      id: tempId,
-      tag: '문서 업로드',
-      time: getNowLabel(),
-      summary: `⏳ 업로드 중...: ${names}`,
-      msgCount: 0,
-    };
-
-    setHistories((prev) => [uploadingHistory, ...prev]);
-
-    const formData = new FormData();
-    Array.from(files).forEach((file) => {
-      formData.append('documents', file);
-    });
-
-    try {
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-
-      setHistories((prev) =>
-        prev.map((history) =>
-          history.id === tempId
-            ? { ...history, summary: `✅ 파일 업로드 완료: ${names}`, msgCount: 1 }
-            : history
-        )
-      );
-    } catch (error) {
-      console.error('파일 전송 실패:', error);
-
-      setHistories((prev) =>
-        prev.map((history) =>
-          history.id === tempId ? { ...history, summary: `❌ 업로드 실패: ${names}` } : history
-        )
-      );
-    }
-  };
-
-  if (isLoading) {
-    return (
-      <LoadingSpinner
-        message={id === 'new' ? '새로운 캔버스를 준비하는 중...' : '노트북 데이터를 불러오는 중...'}
-      />
-    );
-  }
+  if (isLoading) return <LoadingSpinner message="소스를 불러오는 중..." />;
 
   return (
-    <div
-      style={{
-        height: '100%',
-        backgroundColor: 'var(--bg)',
-        overflowY: 'auto',
-        animation: 'fadeIn 0.3s ease-in-out',
-      }}
-    >
-      <style>{`@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }`}</style>
-
+    <div style={{ height: '100%', backgroundColor: 'var(--bg)', overflowY: 'auto' }}>
       <header className="topbar">
         <div className="topbar-inner container">
           <div className="topbar-row">
-            <button
-              type="button"
-              onClick={() => navigate('/')}
-              style={{
-                background: 'transparent',
-                border: 'none',
-                cursor: 'pointer',
-                marginRight: '16px',
-                display: 'flex',
-                alignItems: 'center',
-                color: 'var(--ink)',
-              }}
-            >
-              <svg
-                viewBox="0 0 24 24"
-                style={{
-                  width: '24px',
-                  height: '24px',
-                  fill: 'none',
-                  stroke: 'currentColor',
-                  strokeWidth: 2,
-                  strokeLinecap: 'round',
-                  strokeLinejoin: 'round',
-                }}
-              >
-                <path d="M15 18l-6-6 6-6" />
-              </svg>
-            </button>
+            <div className="brand">
+              <Mascot size="sm" />
+              <div className="brand-text">
+                <h1 className="name">라이브러리</h1>
+                <span className="status">
+                  <span className="dot"></span>
+                  모든 노트북의 소스 모아보기
+                </span>
+              </div>
+            </div>
 
-            <BrandBlock
-              name={id === 'new' ? '새 노트북' : '작업 노트북'}
-              status="온라인"
-            />
-
-            <button className="upload-btn" type="button" onClick={handleUploadClick}>
-              <svg
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="white"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d="M12 3v12" />
-                <path d="M7 8l5-5 5 5" />
-                <path d="M5 21h14a2 2 0 0 0 2-2v-4" />
-                <path d="M3 15v4a2 2 0 0 0 2 2" />
+            <div className="composer" style={{ padding: '8px 16px', width: '260px', borderRadius: '12px' }}>
+              <svg viewBox="0 0 24 24" style={{ width: '16px', fill: 'none', stroke: 'var(--ink-soft)', strokeWidth: 2 }}>
+                <circle cx="11" cy="11" r="8" />
+                <path d="M21 21l-4.3-4.3" />
               </svg>
-              문서 업로드
-            </button>
-            <input
-              type="file"
-              ref={fileInputRef}
-              style={{ display: 'none' }}
-              multiple
-              onChange={handleFileChange}
-            />
+              <input
+                type="text"
+                value={keyword}
+                onChange={(e) => setKeyword(e.target.value)}
+                placeholder="소스/노트북 이름 검색..."
+                style={{ marginLeft: '8px', fontSize: '13.5px' }}
+              />
+            </div>
           </div>
-
-          <ChatComposer value={msgInput} onChange={setMsgInput} onSubmit={handleChatSubmit} />
         </div>
       </header>
 
       <main className="dashboard-main container">
-        <SectionHead title="대화 기록" subtitle={`총 ${histories.length}개`} />
-
-        <div className="history-grid">
-          {histories.map((history) => (
-            <HistoryCard
-              key={history.id}
-              tag={history.tag}
-              time={history.time}
-              title={history.summary}
-              meta={`메시지 ${history.msgCount}개`}
-            />
+        <div className="segment" style={{ maxWidth: '360px' }}>
+          {FILTERS.map((f, i) => (
+            <button key={f.label} type="button" className={filterIndex === i ? 'active' : ''} onClick={() => setFilterIndex(i)}>
+              {f.label}
+            </button>
           ))}
-
-          <AddCard
-            onClick={() => document.querySelector<HTMLInputElement>('.composer input')?.focus()}
-          />
         </div>
-      </main>
 
-      <div className="help-fab">?</div>
+        {filtered.length === 0 ? (
+          <div style={{ textAlign: 'center', color: 'var(--ink-soft)', marginTop: '60px' }}>
+            <p style={{ fontWeight: 700, color: 'var(--ink)', marginBottom: '8px' }}>
+              {allSources.length === 0 ? '아직 추가된 소스가 없습니다' : '조건에 맞는 소스가 없습니다'}
+            </p>
+            <p style={{ fontSize: '13px' }}>
+              노트북에서 파일·웹사이트·텍스트를 소스로 추가하면 여기 모아서 볼 수 있어요.
+            </p>
+          </div>
+        ) : (
+          <div className="history-grid">
+            {filtered.map((s) => (
+              <div
+                key={`${s.notebookId}-${s.id}`}
+                className="history-card"
+                onClick={() => navigate(`/notebook/${s.notebookId}`)}
+              >
+                <div className="row-top">
+                  <span className="tag">{TYPE_LABEL[s.type]}</span>
+                  {s.status !== 'DONE' && <span className="time">{STATUS_LABEL[s.status]}</span>}
+                </div>
+                <div className="summary" style={{ fontSize: '14.5px', fontWeight: 700 }}>
+                  {s.name}
+                </div>
+                <div className="meta">📓 {s.notebookTitle}</div>
+              </div>
+            ))}
+          </div>
+        )}
+      </main>
     </div>
   );
 };

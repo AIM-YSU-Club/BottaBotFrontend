@@ -1,19 +1,10 @@
-import { useState, type CSSProperties } from 'react';
+import { useEffect, useState, type CSSProperties } from 'react';
 import { useNavigate } from 'react-router-dom';
 import BrandBlock from '../components/notebook/BrandBlock';
 import SectionHead from '../components/notebook/SectionHead';
 import HistoryCard from '../components/notebook/HistoryCard';
 import AddCard from '../components/notebook/AddCard';
-import {
-  listNotebooks,
-  deleteNotebook,
-  renameNotebook,
-  togglePin,
-  addNotebookToCollection,
-  removeNotebookFromCollection,
-  listCollectionNames,
-  type NotebookRecord,
-} from '../utils/notebookStore';
+import { listNotebooks, deleteNotebook, updateNotebook, type NotebookSummary } from '../utils/notebookStore';
 
 const menuBtnStyle: CSSProperties = {
   display: 'block',
@@ -52,53 +43,75 @@ const HomePage = () => {
     },
   ];
 
-  // 노트북 페이지에서 만들고 편집한 실제 노트북 목록 (localStorage 기반, notebookStore.ts 참고)
-  const [recentNotebooks, setRecentNotebooks] = useState<NotebookRecord[]>(() => listNotebooks());
+  // NB01_NOTE02: GET /notebooks (keyword 검색 지원)
+  const [keyword, setKeyword] = useState('');
+  const [recentNotebooks, setRecentNotebooks] = useState<NotebookSummary[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
-  const [collectionPickerId, setCollectionPickerId] = useState<string | null>(null);
-  const [newCollectionName, setNewCollectionName] = useState('');
 
-  const refresh = () => setRecentNotebooks(listNotebooks());
+  // SCR06: 노트북 제목/설명 수정, 삭제 — 전용 모달
+  const [editTarget, setEditTarget] = useState<NotebookSummary | null>(null);
+  const [editTitle, setEditTitle] = useState('');
+  const [editDescription, setEditDescription] = useState('');
+  const [editSaving, setEditSaving] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<NotebookSummary | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
-  const closeMenus = () => {
-    setMenuOpenId(null);
-    setCollectionPickerId(null);
-    setNewCollectionName('');
-  };
-
-  const handleDelete = (id: string, title: string) => {
-    if (!window.confirm(`"${title}" 노트북을 삭제할까요? 되돌릴 수 없습니다.`)) return;
-    deleteNotebook(id);
-    refresh();
-    closeMenus();
-  };
-
-  const handleRename = (id: string, currentTitle: string) => {
-    const next = window.prompt('새 제목을 입력하세요', currentTitle);
-    if (next && next.trim()) {
-      renameNotebook(id, next.trim());
-      refresh();
+  const refresh = async (kw: string) => {
+    setIsLoading(true);
+    try {
+      const data = await listNotebooks(kw || undefined);
+      setRecentNotebooks(data);
+    } catch (error) {
+      console.error('노트북 목록 조회 실패:', error);
+    } finally {
+      setIsLoading(false);
     }
-    closeMenus();
   };
 
-  const handlePin = (id: string) => {
-    togglePin(id);
-    refresh();
-    closeMenus();
+  useEffect(() => {
+    const timer = setTimeout(() => refresh(keyword), 250); // 타이핑마다 바로 쏘지 않도록 살짝 디바운스
+    return () => clearTimeout(timer);
+  }, [keyword]);
+
+  const openEditModal = (nb: NotebookSummary) => {
+    setEditTarget(nb);
+    setEditTitle(nb.title);
+    setEditDescription(nb.description ?? '');
+    setMenuOpenId(null);
+  };
+  const closeEditModal = () => setEditTarget(null);
+
+  const handleSaveEdit = async () => {
+    if (!editTarget || !editTitle.trim()) return;
+    setEditSaving(true);
+    try {
+      // NB01_NOTE03
+      await updateNotebook(editTarget.id, { title: editTitle.trim(), description: editDescription.trim() || undefined });
+      closeEditModal();
+      refresh(keyword);
+    } catch (error) {
+      console.error('노트북 수정 실패:', error);
+      alert('수정에 실패했습니다.');
+    } finally {
+      setEditSaving(false);
+    }
   };
 
-  const handleToggleCollection = (id: string, name: string, isMember: boolean) => {
-    if (isMember) removeNotebookFromCollection(id, name);
-    else addNotebookToCollection(id, name);
-    refresh();
-  };
-
-  const handleCreateCollection = (id: string) => {
-    if (!newCollectionName.trim()) return;
-    addNotebookToCollection(id, newCollectionName.trim());
-    setNewCollectionName('');
-    refresh();
+  const handleConfirmDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      // NB01_NOTE04
+      await deleteNotebook(deleteTarget.id);
+      setDeleteTarget(null);
+      refresh(keyword);
+    } catch (error) {
+      console.error('노트북 삭제 실패:', error);
+      alert('삭제에 실패했습니다.');
+    } finally {
+      setDeleting(false);
+    }
   };
 
   return (
@@ -118,6 +131,8 @@ const HomePage = () => {
               </svg>
               <input
                 type="text"
+                value={keyword}
+                onChange={(e) => setKeyword(e.target.value)}
                 placeholder="노트북 검색..."
                 style={{ marginLeft: '8px', fontSize: '13.5px' }}
               />
@@ -154,15 +169,13 @@ const HomePage = () => {
           ))}
         </div>
 
-        <SectionHead title="최근 노트북" subtitle={`총 ${recentNotebooks.length}개`} />
+        <SectionHead title="최근 노트북" subtitle={isLoading ? '불러오는 중...' : `총 ${recentNotebooks.length}개`} />
 
         <div className="history-grid">
           <AddCard label="새 노트 만들기" onClick={() => navigate('/notebook/new')} />
 
           {recentNotebooks.map((nb) => {
             const isMenuOpen = menuOpenId === nb.id;
-            const isCollectionPicker = collectionPickerId === nb.id;
-            const collections = nb.collections ?? [];
 
             return (
               <div
@@ -172,11 +185,10 @@ const HomePage = () => {
                 onClick={() => navigate(`/notebook/${nb.id}`)}
               >
                 <div className="row-top">
-                  <span className="tag">{nb.pinned ? '📌 고정됨' : '내 노트북'}</span>
+                  <span className="tag">내 노트북</span>
                   <svg
                     onClick={(e) => {
                       e.stopPropagation();
-                      setCollectionPickerId(null);
                       setMenuOpenId(isMenuOpen ? null : nb.id);
                     }}
                     viewBox="0 0 24 24"
@@ -191,36 +203,19 @@ const HomePage = () => {
                 <div className="summary" style={{ fontSize: '15.5px', fontWeight: 700, marginTop: '8px' }}>
                   {nb.title}
                 </div>
-                <div className="meta" style={{ marginTop: '18px', fontSize: '12px' }}>
-                  {new Date(nb.updatedAt).toLocaleDateString('ko-KR')} • 소스 {nb.sources.length}개
-                </div>
-
-                {collections.length > 0 && (
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '10px' }}>
-                    {collections.map((c) => (
-                      <span
-                        key={c}
-                        style={{
-                          fontSize: '11px',
-                          fontWeight: 700,
-                          padding: '3px 10px',
-                          borderRadius: '999px',
-                          background: 'var(--leaf-soft)',
-                          color: 'var(--leaf-deep)',
-                        }}
-                      >
-                        {c}
-                      </span>
-                    ))}
-                  </div>
+                {nb.description && (
+                  <div style={{ fontSize: '12px', color: 'var(--ink-soft)', marginTop: '4px' }}>{nb.description}</div>
                 )}
+                <div className="meta" style={{ marginTop: '18px', fontSize: '12px' }}>
+                  {new Date(nb.updatedAt).toLocaleDateString('ko-KR')} • 소스 {nb.sourceCount}개
+                </div>
 
                 {isMenuOpen && (
                   <>
                     <div
                       onClick={(e) => {
                         e.stopPropagation();
-                        closeMenus();
+                        setMenuOpenId(null);
                       }}
                       style={{ position: 'fixed', inset: 0, zIndex: 40 }}
                     />
@@ -235,81 +230,31 @@ const HomePage = () => {
                         borderRadius: '14px',
                         boxShadow: 'var(--shadow)',
                         zIndex: 50,
-                        minWidth: '190px',
+                        minWidth: '150px',
                         overflow: 'hidden',
                       }}
                     >
-                      {isCollectionPicker ? (
-                        <div style={{ padding: '12px' }}>
-                          <p style={{ fontSize: '12px', fontWeight: 700, margin: '0 0 8px' }}>컬렉션에 추가</p>
-
-                          {listCollectionNames().length > 0 && (
-                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '10px' }}>
-                              {listCollectionNames().map((c) => {
-                                const isMember = collections.includes(c);
-                                return (
-                                  <button
-                                    key={c}
-                                    type="button"
-                                    onClick={() => handleToggleCollection(nb.id, c, isMember)}
-                                    style={{
-                                      fontSize: '11px',
-                                      fontWeight: 700,
-                                      padding: '4px 10px',
-                                      borderRadius: '999px',
-                                      border: '1px solid var(--leaf-line)',
-                                      background: isMember ? 'var(--leaf-deep)' : 'transparent',
-                                      color: isMember ? '#fff' : 'var(--ink)',
-                                      cursor: 'pointer',
-                                    }}
-                                  >
-                                    {c}
-                                  </button>
-                                );
-                              })}
-                            </div>
-                          )}
-
-                          <div style={{ display: 'flex', gap: '6px' }}>
-                            <input
-                              value={newCollectionName}
-                              onChange={(e) => setNewCollectionName(e.target.value)}
-                              placeholder="새 컬렉션 이름"
-                              style={{
-                                flex: 1,
-                                fontSize: '12px',
-                                border: '1px solid var(--leaf-line)',
-                                borderRadius: '8px',
-                                padding: '6px 8px',
-                                fontFamily: 'inherit',
-                              }}
-                            />
-                            <button
-                              type="button"
-                              className="btn btn-primary"
-                              style={{ width: 'auto', padding: '6px 12px', fontSize: '12px', margin: 0 }}
-                              onClick={() => handleCreateCollection(nb.id)}
-                            >
-                              추가
-                            </button>
-                          </div>
-                        </div>
-                      ) : (
-                        <>
-                          <button type="button" style={menuBtnStyle} onClick={() => handleDelete(nb.id, nb.title)}>
-                            🗑 삭제
-                          </button>
-                          <button type="button" style={menuBtnStyle} onClick={() => handleRename(nb.id, nb.title)}>
-                            ✏️ 제목 수정
-                          </button>
-                          <button type="button" style={menuBtnStyle} onClick={() => setCollectionPickerId(nb.id)}>
-                            📁 컬렉션에 추가
-                          </button>
-                          <button type="button" style={menuBtnStyle} onClick={() => handlePin(nb.id)}>
-                            📌 {nb.pinned ? '고정 해제' : '맨 위에 고정'}
-                          </button>
-                        </>
-                      )}
+                      <button
+                        type="button"
+                        style={menuBtnStyle}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setMenuOpenId(null);
+                          setDeleteTarget(nb);
+                        }}
+                      >
+                        🗑 삭제
+                      </button>
+                      <button
+                        type="button"
+                        style={menuBtnStyle}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openEditModal(nb);
+                        }}
+                      >
+                        ✏️ 제목 수정
+                      </button>
                     </div>
                   </>
                 )}
@@ -318,6 +263,76 @@ const HomePage = () => {
           })}
         </div>
       </main>
+
+      {/* SCR06: 노트북 제목/설명 수정 모달 */}
+      {editTarget && (
+        <div
+          onClick={closeEditModal}
+          style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{ backgroundColor: 'var(--bg)', borderRadius: '24px', padding: '28px', width: '90%', maxWidth: '440px', boxShadow: 'var(--shadow)' }}
+          >
+            <h2 style={{ fontSize: '18px', margin: '0 0 18px' }}>노트북 정보 수정</h2>
+
+            <div className="field">
+              <label>제목</label>
+              <input value={editTitle} onChange={(e) => setEditTitle(e.target.value)} autoFocus />
+            </div>
+
+            <div className="field">
+              <label>설명 (선택)</label>
+              <input
+                value={editDescription}
+                onChange={(e) => setEditDescription(e.target.value)}
+                placeholder="이 노트북에 대한 설명을 입력하세요"
+              />
+            </div>
+
+            <div style={{ display: 'flex', gap: '10px', marginTop: '6px' }}>
+              <button type="button" className="btn btn-outline" style={{ flex: 1 }} onClick={closeEditModal}>
+                취소
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                style={{ flex: 1 }}
+                disabled={editSaving || !editTitle.trim()}
+                onClick={handleSaveEdit}
+              >
+                {editSaving ? '저장 중...' : '저장'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* SCR06: 노트북 삭제 확인 모달 */}
+      {deleteTarget && (
+        <div
+          onClick={() => setDeleteTarget(null)}
+          style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{ backgroundColor: 'var(--bg)', borderRadius: '24px', padding: '28px', width: '90%', maxWidth: '400px', boxShadow: 'var(--shadow)', textAlign: 'center' }}
+          >
+            <h2 style={{ fontSize: '18px', margin: '0 0 10px' }}>노트북을 삭제할까요?</h2>
+            <p style={{ fontSize: '13.5px', color: 'var(--ink-soft)', margin: '0 0 22px' }}>
+              "{deleteTarget.title}"의 모든 소스와 대화 기록이 함께 삭제됩니다. 되돌릴 수 없습니다.
+            </p>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button type="button" className="btn btn-outline" style={{ flex: 1 }} onClick={() => setDeleteTarget(null)}>
+                취소
+              </button>
+              <button type="button" className="btn btn-danger ready" style={{ flex: 1 }} disabled={deleting} onClick={handleConfirmDelete}>
+                {deleting ? '삭제 중...' : '삭제'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

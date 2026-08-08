@@ -1,14 +1,27 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import axios from 'axios';
 import Mascot from '../components/common/Mascot';
+import LoadingSpinner from '../components/common/LoadingSpinner';
 import ChatComposer from '../components/notebook/ChatComposer';
-import { loadAllNotebooks, saveNotebook, type NotebookRecord, type Source } from '../utils/notebookStore';
+import {
+  createNotebook,
+  getNotebook,
+  updateNotebook,
+  uploadFileSource,
+  addUrlSource,
+  addTextSource,
+  createChatSession,
+  streamChatAnswer,
+  inferFileSourceType,
+  type Source,
+  type Citation,
+} from '../utils/notebookStore';
 
 interface ChatMessage {
-  id: number;
-  role: 'user' | 'assistant';
+  id: string;
+  role: 'USER' | 'ASSISTANT';
   content: string;
+  citations?: Citation[];
 }
 
 const suggestions = ['새로운 주제에 관해 알아보기', '새로운 항목 만들기', '프로젝트 진행하기'];
@@ -18,50 +31,67 @@ const NotebookPage = () => {
   const navigate = useNavigate();
 
   const [notebookId, setNotebookId] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [title, setTitle] = useState('제목 없는 노트북');
+  const [description, setDescription] = useState('');
   const [sources, setSources] = useState<Source[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [msgInput, setMsgInput] = useState('');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isReplying, setIsReplying] = useState(false);
+  const [sessionId, setSessionId] = useState<string | null>(null);
 
   const [sourceModalOpen, setSourceModalOpen] = useState(false);
   const [sourceModalMode, setSourceModalMode] = useState<'menu' | 'website' | 'paste'>('menu');
   const [websiteUrl, setWebsiteUrl] = useState('');
   const [pasteText, setPasteText] = useState('');
+  const [sourceBusy, setSourceBusy] = useState(false);
 
   useEffect(() => {
     if (!id) return;
+    let cancelled = false;
 
-    if (id === 'new') {
-      // ponytail: 여기서 바로 저장하지 않습니다. React StrictMode는 개발 모드에서 이 effect를
-      // 두 번 실행하는데, 미리 저장해버리면 사용자가 아무 것도 안 했는데도
-      // 빈 "제목 없는 노트북" 유령 레코드가 두 개 생겨서 홈 화면 "최근 노트북"에 뜹니다.
-      // 실제로 제목을 바꾸거나 소스를 추가하는 등 편집을 해야 그때 저장되도록 미룹니다.
-      navigate(`/notebook/${crypto.randomUUID()}`, { replace: true });
-      return;
-    }
+    const load = async () => {
+      setIsLoading(true);
+      setLoadError(false);
+      try {
+        if (id === 'new') {
+          // NB01_NOTE01: POST /notebooks — 서버가 진짜 notebookId를 내려줄 때까지는
+          // 아무것도 로컬에 만들지 않고, 받은 id로 바로 갈아탑니다.
+          const created = await createNotebook('제목 없는 노트북');
+          if (!cancelled) navigate(`/notebook/${created.notebookId}`, { replace: true });
+          return;
+        }
 
-    const existing = loadAllNotebooks()[id];
-    setNotebookId(id);
-    setTitle(existing?.title ?? '제목 없는 노트북');
-    setSources(existing?.sources ?? []);
+        const detail = await getNotebook(id);
+        if (cancelled) return;
+        setNotebookId(detail.id);
+        setTitle(detail.title);
+        setDescription(detail.description ?? '');
+        setSources(detail.sources ?? []);
+      } catch (error) {
+        console.error('노트북 로딩 실패:', error);
+        if (!cancelled) setLoadError(true);
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    };
+
+    load();
+    return () => {
+      cancelled = true;
+    };
   }, [id, navigate]);
 
-  const persist = (patch: Partial<Pick<NotebookRecord, 'title' | 'sources'>>) => {
-    if (!notebookId) return;
-    // 기존 레코드와 병합해서 저장합니다. 그냥 새 객체로 덮어쓰면 홈 화면에서 설정한
-    // pinned(고정)/collections(컬렉션) 값이 여기서 제목만 바꿔도 날아가 버립니다.
-    const existing = loadAllNotebooks()[notebookId];
-    saveNotebook({ ...existing, id: notebookId, title, sources, updatedAt: Date.now(), ...patch });
-  };
-
-  const handleTitleBlur = () => persist({ title });
-
-  const addSource = (name: string) => {
-    const nextSources = [...sources, { id: Date.now() + Math.random(), name }];
-    setSources(nextSources);
-    persist({ sources: nextSources });
+  const handleMetaBlur = async () => {
+    if (!notebookId || !title.trim()) return;
+    try {
+      // NB01_NOTE03: title/description 둘 다 넘길 수 있어서 같이 저장합니다.
+      await updateNotebook(notebookId, { title: title.trim(), description: description.trim() || undefined });
+    } catch (error) {
+      console.error('노트북 정보 저장 실패:', error);
+    }
   };
 
   const openSourceModal = () => {
@@ -74,67 +104,117 @@ const NotebookPage = () => {
     setPasteText('');
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
-    if (!files || files.length === 0) return;
+    if (!files || files.length === 0 || !notebookId) return;
 
-    const nextSources = [
-      ...sources,
-      ...Array.from(files).map((f) => ({ id: Date.now() + Math.random(), name: f.name })),
-    ];
-    setSources(nextSources);
-    persist({ sources: nextSources });
-    e.target.value = '';
-    closeSourceModal();
+    setSourceBusy(true);
+    try {
+      // SRC01_UPLOAD01
+      for (const file of Array.from(files)) {
+        const res = await uploadFileSource(notebookId, file);
+        setSources((prev) => [
+          ...prev,
+          { id: res.sourceId, name: file.name, type: inferFileSourceType(file.name), status: res.status },
+        ]);
+      }
+      closeSourceModal();
+    } catch (error) {
+      console.error('파일 업로드 실패:', error);
+      alert('파일 업로드에 실패했습니다.');
+    } finally {
+      setSourceBusy(false);
+      e.target.value = '';
+    }
   };
 
-  const handleAddWebsite = () => {
-    if (!websiteUrl.trim()) return;
-    addSource(websiteUrl.trim());
-    closeSourceModal();
+  const handleAddWebsite = async () => {
+    if (!websiteUrl.trim() || !notebookId) return;
+    setSourceBusy(true);
+    try {
+      // SRC01_UPLOAD02
+      const res = await addUrlSource(notebookId, websiteUrl.trim());
+      setSources((prev) => [
+        ...prev,
+        { id: res.sourceId, name: res.title ?? websiteUrl.trim(), type: 'URL', status: res.status },
+      ]);
+      closeSourceModal();
+    } catch (error) {
+      console.error('URL 소스 추가 실패:', error);
+      alert('URL 소스를 추가하지 못했습니다. 크롤링이 차단됐을 수 있어요.');
+    } finally {
+      setSourceBusy(false);
+    }
   };
 
-  const handleAddPastedText = () => {
-    if (!pasteText.trim()) return;
-    const preview = pasteText.trim().slice(0, 24);
-    addSource(`📋 ${preview}${pasteText.trim().length > 24 ? '…' : ''}`);
-    closeSourceModal();
+  const handleAddPastedText = async () => {
+    if (!pasteText.trim() || !notebookId) return;
+    setSourceBusy(true);
+    try {
+      // SRC01_UPLOAD03
+      const preview = pasteText.trim().slice(0, 24);
+      const title = `📋 ${preview}${pasteText.trim().length > 24 ? '…' : ''}`;
+      const res = await addTextSource(notebookId, pasteText.trim(), title);
+      setSources((prev) => [...prev, { id: res.sourceId, name: title, type: 'TEXT', status: res.status }]);
+      closeSourceModal();
+    } catch (error) {
+      console.error('텍스트 소스 추가 실패:', error);
+      alert('텍스트 소스를 추가하지 못했습니다.');
+    } finally {
+      setSourceBusy(false);
+    }
   };
 
   const sendMessage = async (text: string) => {
     if (!text.trim() || !notebookId) return;
 
-    setMessages((prev) => [...prev, { id: Date.now(), role: 'user', content: text.trim() }]);
+    setMessages((prev) => [...prev, { id: crypto.randomUUID(), role: 'USER', content: text.trim() }]);
     setMsgInput('');
     setIsReplying(true);
 
+    const assistantId = crypto.randomUUID();
+    let received = false;
+
     try {
-      // ponytail: 채팅 백엔드 스펙이 아직 없어 임시 경로로 호출합니다.
-      // 공용 api 인스턴스(src/api/axios.ts)는 401을 받으면 토큰 재발급을 시도하다
-      // 실패 시 전체 로그아웃까지 시켜버려서, 아직 존재하지 않는 이 엔드포인트가
-      // 실패할 때마다 사용자가 로그인 화면으로 튕겨나가는 문제가 있었습니다.
-      // 그래서 이 호출은 인터셉터가 없는 일반 axios로 분리했습니다.
-      // 실제 API 스펙이 나오면 경로/응답 파싱만 바꾸면 됩니다.
-      const token = sessionStorage.getItem('accessToken');
-      const res = await axios.post<{ reply?: string }>(
-        `${import.meta.env.VITE_API_BASE_URL}/notebooks/${notebookId}/chat`,
-        { message: text.trim() },
-        { headers: token ? { Authorization: `Bearer ${token}` } : undefined }
+      // CHAT01_CHAT03: 세션이 없으면 먼저 만들고, 있으면 재사용합니다.
+      let sid = sessionId;
+      if (!sid) {
+        const session = await createChatSession(notebookId);
+        sid = session.sessionId;
+        setSessionId(sid);
+      }
+
+      setMessages((prev) => [...prev, { id: assistantId, role: 'ASSISTANT', content: '' }]);
+
+      // CHAT01_CHAT01/CHAT02: 질문 전송 → RAG 답변 스트리밍 + 출처 인용
+      await streamChatAnswer(
+        sid,
+        text.trim(),
+        (token) => {
+          received = true;
+          setMessages((prev) => prev.map((m) => (m.id === assistantId ? { ...m, content: m.content + token } : m)));
+        },
+        (citations) => {
+          setMessages((prev) => prev.map((m) => (m.id === assistantId ? { ...m, citations } : m)));
+        }
       );
-      setMessages((prev) => [
-        ...prev,
-        { id: Date.now() + 1, role: 'assistant', content: res.data?.reply ?? '(빈 응답)' },
-      ]);
+
+      if (!received) {
+        setMessages((prev) => prev.map((m) => (m.id === assistantId ? { ...m, content: '(빈 응답)' } : m)));
+      }
     } catch (error) {
       console.error('채팅 응답 실패:', error);
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: Date.now() + 1,
-          role: 'assistant',
-          content: '⚠️ 아직 백엔드와 연결되지 않아 응답을 받지 못했습니다.',
-        },
-      ]);
+      setMessages((prev) => {
+        const withoutEmptyPlaceholder = prev.filter((m) => m.id !== assistantId || m.content);
+        return [
+          ...withoutEmptyPlaceholder,
+          {
+            id: crypto.randomUUID(),
+            role: 'ASSISTANT',
+            content: '⚠️ 아직 백엔드와 연결되지 않아 응답을 받지 못했습니다.',
+          },
+        ];
+      });
     } finally {
       setIsReplying(false);
     }
@@ -145,12 +225,15 @@ const NotebookPage = () => {
     sendMessage(msgInput);
   };
 
-  const handleCreateNotebook = () => {
-    persist({}); // 지금 작업 중이던 노트북을 먼저 저장
-    navigate('/notebook/new');
-  };
+  if (isLoading) return <LoadingSpinner message={id === 'new' ? '노트북을 만드는 중...' : '노트북을 불러오는 중...'} />;
 
-  if (!notebookId) return null;
+  if (loadError || !notebookId) {
+    return (
+      <LoadingSpinner
+        message="노트북을 불러오지 못했습니다. 홈으로 돌아가 다시 시도해 주세요."
+      />
+    );
+  }
 
   return (
     <div style={{ height: '100vh', backgroundColor: 'var(--bg)', display: 'flex', flexDirection: 'column' }}>
@@ -180,30 +263,47 @@ const NotebookPage = () => {
 
             <Mascot size="sm" />
 
-            <input
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              onBlur={handleTitleBlur}
-              style={{
-                fontSize: '20px',
-                fontWeight: 800,
-                color: 'var(--black)',
-                border: 'none',
-                outline: 'none',
-                background: 'transparent',
-                fontFamily: 'inherit',
-                marginLeft: '10px',
-                padding: '4px 6px',
-                borderRadius: '8px',
-                minWidth: '80px',
-              }}
-              onFocus={(e) => (e.currentTarget.style.background = 'var(--leaf-soft)')}
-              onBlurCapture={(e) => (e.currentTarget.style.background = 'transparent')}
-            />
+            <div style={{ display: 'flex', flexDirection: 'column', marginLeft: '10px', minWidth: '80px' }}>
+              <input
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                onBlur={handleMetaBlur}
+                style={{
+                  fontSize: '20px',
+                  fontWeight: 800,
+                  color: 'var(--black)',
+                  border: 'none',
+                  outline: 'none',
+                  background: 'transparent',
+                  fontFamily: 'inherit',
+                  padding: '4px 6px',
+                  borderRadius: '8px',
+                }}
+                onFocus={(e) => (e.currentTarget.style.background = 'var(--leaf-soft)')}
+                onBlurCapture={(e) => (e.currentTarget.style.background = 'transparent')}
+              />
+              <input
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                onBlur={handleMetaBlur}
+                placeholder="설명 추가 (선택)"
+                style={{
+                  fontSize: '12.5px',
+                  color: 'var(--ink-soft)',
+                  border: 'none',
+                  outline: 'none',
+                  background: 'transparent',
+                  fontFamily: 'inherit',
+                  padding: '0 6px',
+                }}
+                onFocus={(e) => (e.currentTarget.style.background = 'var(--leaf-soft)')}
+                onBlurCapture={(e) => (e.currentTarget.style.background = 'transparent')}
+              />
+            </div>
 
             <div style={{ flex: 1 }} />
 
-            <button className="upload-btn" type="button" onClick={handleCreateNotebook}>
+            <button className="upload-btn" type="button" onClick={() => navigate('/notebook/new')}>
               <svg viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M12 5v14M5 12h14" />
               </svg>
@@ -231,8 +331,26 @@ const NotebookPage = () => {
           ) : (
             <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {sources.map((s) => (
-                <li key={s.id} style={{ fontSize: '13px', color: 'var(--ink)', padding: '8px 10px', border: '1px solid var(--leaf-line)', borderRadius: '10px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {s.name}
+                <li
+                  key={s.id}
+                  style={{
+                    fontSize: '13px',
+                    color: 'var(--ink)',
+                    padding: '8px 10px',
+                    border: '1px solid var(--leaf-line)',
+                    borderRadius: '10px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: '8px',
+                  }}
+                >
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.name}</span>
+                  {s.status !== 'DONE' && (
+                    <span style={{ fontSize: '11px', color: 'var(--ink-soft)', flex: 'none' }}>
+                      {s.status === 'ERROR' ? '오류' : s.status === 'PROCESSING' ? '처리 중' : '대기'}
+                    </span>
+                  )}
                 </li>
               ))}
             </ul>
@@ -263,21 +381,43 @@ const NotebookPage = () => {
           ) : (
             <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '10px', padding: '4px 4px 12px' }}>
               {messages.map((m) => (
-                <div
-                  key={m.id}
-                  style={{
-                    alignSelf: m.role === 'user' ? 'flex-end' : 'flex-start',
-                    maxWidth: '70%',
-                    backgroundColor: m.role === 'user' ? 'var(--black)' : 'var(--leaf-soft)',
-                    color: m.role === 'user' ? '#fff' : 'var(--ink)',
-                    padding: '10px 14px',
-                    borderRadius: '16px',
-                    fontSize: '14px',
-                    lineHeight: 1.5,
-                    whiteSpace: 'pre-wrap',
-                  }}
-                >
-                  {m.content}
+                <div key={m.id} style={{ alignSelf: m.role === 'USER' ? 'flex-end' : 'flex-start', maxWidth: '70%' }}>
+                  <div
+                    style={{
+                      backgroundColor: m.role === 'USER' ? 'var(--black)' : 'var(--leaf-soft)',
+                      color: m.role === 'USER' ? '#fff' : 'var(--ink)',
+                      padding: '10px 14px',
+                      borderRadius: '16px',
+                      fontSize: '14px',
+                      lineHeight: 1.5,
+                      whiteSpace: 'pre-wrap',
+                    }}
+                  >
+                    {m.content}
+                  </div>
+
+                  {/* CHAT01_CHAT02: 출처 인용 표시 */}
+                  {m.citations && m.citations.length > 0 && (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '6px' }}>
+                      {m.citations.map((c, i) => (
+                        <span
+                          key={i}
+                          title={c.url}
+                          style={{
+                            fontSize: '11px',
+                            padding: '3px 9px',
+                            borderRadius: '999px',
+                            border: '1px solid var(--leaf-line)',
+                            color: 'var(--leaf-deep)',
+                            fontWeight: 700,
+                          }}
+                        >
+                          📄 {c.fileName ?? c.url ?? '출처'}
+                          {c.page ? ` p.${c.page}` : ''}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </div>
               ))}
               {isReplying && (
@@ -361,20 +501,20 @@ const NotebookPage = () => {
                   }}
                 >
                   <p style={{ fontWeight: 700, margin: '0 0 4px' }}>또는 파일 드롭</p>
-                  <p style={{ fontSize: '12.5px', color: 'var(--ink-soft)', margin: 0 }}>PDF, 이미지, 문서, 오디오 등</p>
+                  <p style={{ fontSize: '12.5px', color: 'var(--ink-soft)', margin: 0 }}>PDF, DOCX, TXT, PPTX, XLSX (최대 50MB)</p>
                 </div>
 
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px' }}>
-                  <button type="button" className="btn btn-outline" onClick={() => fileInputRef.current?.click()}>
+                  <button type="button" className="btn btn-outline" disabled={sourceBusy} onClick={() => fileInputRef.current?.click()}>
                     ⬆ 파일 업로드
                   </button>
-                  <button type="button" className="btn btn-outline" onClick={() => setSourceModalMode('website')}>
+                  <button type="button" className="btn btn-outline" disabled={sourceBusy} onClick={() => setSourceModalMode('website')}>
                     🔗 웹사이트
                   </button>
                   <button type="button" className="btn btn-outline" disabled title="준비 중" style={{ opacity: 0.5, cursor: 'not-allowed' }}>
                     ☁ Drive
                   </button>
-                  <button type="button" className="btn btn-outline" onClick={() => setSourceModalMode('paste')}>
+                  <button type="button" className="btn btn-outline" disabled={sourceBusy} onClick={() => setSourceModalMode('paste')}>
                     📋 붙여넣은 텍스트
                   </button>
                 </div>
@@ -395,8 +535,8 @@ const NotebookPage = () => {
                   <button type="button" className="btn btn-outline" style={{ flex: 1 }} onClick={() => setSourceModalMode('menu')}>
                     뒤로
                   </button>
-                  <button type="button" className="btn btn-primary" style={{ flex: 1 }} onClick={handleAddWebsite}>
-                    추가
+                  <button type="button" className="btn btn-primary" style={{ flex: 1 }} disabled={sourceBusy} onClick={handleAddWebsite}>
+                    {sourceBusy ? '추가 중...' : '추가'}
                   </button>
                 </div>
               </>
@@ -417,8 +557,8 @@ const NotebookPage = () => {
                   <button type="button" className="btn btn-outline" style={{ flex: 1 }} onClick={() => setSourceModalMode('menu')}>
                     뒤로
                   </button>
-                  <button type="button" className="btn btn-primary" style={{ flex: 1 }} onClick={handleAddPastedText}>
-                    추가
+                  <button type="button" className="btn btn-primary" style={{ flex: 1 }} disabled={sourceBusy} onClick={handleAddPastedText}>
+                    {sourceBusy ? '추가 중...' : '추가'}
                   </button>
                 </div>
               </>

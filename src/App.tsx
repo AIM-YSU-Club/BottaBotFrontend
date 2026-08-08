@@ -43,7 +43,7 @@ const App = () => {
             />
 
             <Route
-              path="/library/:id"
+              path="/library"
               element={
                 <ProtectedRoute>
                   <LibraryPage />
