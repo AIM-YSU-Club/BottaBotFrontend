@@ -159,6 +159,13 @@ a { text-decoration: none; }
 .btn-muted.ready { background:var(--black); cursor:pointer; }
 .btn-muted.ready:hover { opacity:.9; }
 
+/* DeactivatePage/ProfilePage에서 이미 쓰고 있었지만 정의가 빠져있던 위험 버튼 스타일 */
+.btn-danger { background:var(--danger-soft); color:var(--danger); margin-top:6px; cursor:not-allowed; }
+.btn-danger.ready { background:var(--danger); color:#fff; cursor:pointer; }
+.btn-danger.ready:hover { opacity:.9; }
+.btn-danger-outline { background:#fff; color:var(--danger); border:1.5px solid var(--danger-line); margin-top:10px; }
+.btn-danger-outline:hover { background:var(--danger-soft); }
+
 .link-row { text-align:center; margin-top:18px; font-size:12.5px; color:var(--ink-soft); }
 .link-row a { color:var(--leaf-deep); font-weight:600; cursor: pointer; }
 .link-row a:hover { text-decoration:underline; }

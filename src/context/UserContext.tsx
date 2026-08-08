@@ -1,6 +1,6 @@
 import React, { createContext, useState, useContext } from 'react';
 
-// 1. 프로필 데이터의 형태(타입)를 정의합니다.
+// 1. 프로필 데이터의 형태(타입)를 정의
 interface User {
   name: string;
   role: string;
@@ -11,7 +11,7 @@ interface UserContextType {
   setUser: React.Dispatch<React.SetStateAction<User>>;
 }
 
-// 2. 빈 컨텍스트(통제실)를 생성합니다.
+// 2. 빈 컨텍스트(통제실)를 생성합니다. 초기값은 undefined로 설정합니다.
 const UserContext = createContext<UserContextType | undefined>(undefined);
 
 // 3. 앱 전체를 감싸줄 '공급자(Provider)' 컴포넌트를 만듭니다.
