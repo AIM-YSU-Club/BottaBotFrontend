@@ -38,6 +38,12 @@ export interface ChatMessage {
   citations?: Citation[];
 }
 
+export interface ChatSession {
+  sessionId: string;
+  title?: string;
+  updatedAt: string;
+}
+
 const EXT_TO_TYPE: Record<string, SourceType> = {
   pdf: 'FILE_PDF',
   docx: 'FILE_DOCX',
@@ -130,9 +136,11 @@ export const listAllSources = async (): Promise<SourceWithNotebook[]> => {
 export const createChatSession = (notebookId: string) =>
   api.post<{ sessionId: string; createdAt: string }>(`/notebooks/${notebookId}/chat-sessions`);
 
-export const listChatSessions = async (notebookId: string) => {
+export const listChatSessions = async (notebookId: string): Promise<ChatSession[]> => {
   const data = await api.get(`/notebooks/${notebookId}/chat-sessions`);
-  return unwrapList<{ sessionId: string; title?: string; updatedAt: string }>(data);
+  return unwrapList<ChatSession>(data).sort(
+    (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+  );
 };
 
 export const deleteChatSession = (sessionId: string) => api.delete<void>(`/chat-sessions/${sessionId}`);

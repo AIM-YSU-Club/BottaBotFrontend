@@ -10,11 +10,17 @@ import {
   uploadFileSource,
   addUrlSource,
   addTextSource,
+  listSources,
+  deleteSource,
   createChatSession,
+  listChatSessions,
+  deleteChatSession,
+  getChatMessages,
   streamChatAnswer,
   inferFileSourceType,
   type Source,
   type Citation,
+  type ChatSession,
 } from '../utils/notebookStore';
 
 interface ChatMessage {
@@ -41,6 +47,9 @@ const NotebookPage = () => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isReplying, setIsReplying] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
+  const [sessions, setSessions] = useState<ChatSession[]>([]);
+  const [sessionMenuOpen, setSessionMenuOpen] = useState(false);
+  const sourcesRef = useRef<Source[]>([]);
 
   const [sourceModalOpen, setSourceModalOpen] = useState(false);
   const [sourceModalMode, setSourceModalMode] = useState<'menu' | 'website' | 'paste'>('menu');
@@ -70,6 +79,21 @@ const NotebookPage = () => {
         setTitle(detail.title);
         setDescription(detail.description ?? '');
         setSources(detail.sources ?? []);
+
+        // CHAT01_CHAT03: 기존 대화 세션이 있으면 가장 최근 것을 이어서 보여줍니다.
+        try {
+          const sessionList = await listChatSessions(id);
+          if (cancelled) return;
+          setSessions(sessionList);
+          if (sessionList.length > 0) {
+            const latest = sessionList[0];
+            setSessionId(latest.sessionId);
+            const history = await getChatMessages(latest.sessionId);
+            if (!cancelled) setMessages(history);
+          }
+        } catch (sessionError) {
+          console.error('대화 세션 조회 실패:', sessionError);
+        }
       } catch (error) {
         console.error('노트북 로딩 실패:', error);
         if (!cancelled) setLoadError(true);
@@ -83,6 +107,30 @@ const NotebookPage = () => {
       cancelled = true;
     };
   }, [id, navigate]);
+
+  useEffect(() => {
+    sourcesRef.current = sources;
+  }, [sources]);
+
+  // SRC02_PROC04: 대기/처리중인 소스가 있으면 상태가 바뀌었는지 주기적으로 확인합니다.
+  // 명세 8장 추가 제안에서 SSE의 대안으로 폴링을 명시적으로 허용하고 있어 더 단순한 폴링으로 구현했습니다.
+  useEffect(() => {
+    if (!notebookId) return;
+
+    const interval = setInterval(async () => {
+      const hasPending = sourcesRef.current.some((s) => s.status === 'PENDING' || s.status === 'PROCESSING');
+      if (!hasPending) return;
+
+      try {
+        const fresh = await listSources(notebookId);
+        setSources(fresh);
+      } catch (error) {
+        console.error('소스 상태 갱신 실패:', error);
+      }
+    }, 4000);
+
+    return () => clearInterval(interval);
+  }, [notebookId]);
 
   const handleMetaBlur = async () => {
     if (!notebookId || !title.trim()) return;
@@ -165,6 +213,64 @@ const NotebookPage = () => {
     }
   };
 
+  const handleDeleteSource = async (source: Source) => {
+    if (!notebookId) return;
+    if (!window.confirm(`"${source.name}" 소스를 삭제할까요? 관련 임베딩도 함께 삭제됩니다.`)) return;
+
+    try {
+      // SRC02_PROC03
+      await deleteSource(notebookId, source.id);
+      setSources((prev) => prev.filter((s) => s.id !== source.id));
+    } catch (error) {
+      console.error('소스 삭제 실패:', error);
+      alert('소스 삭제에 실패했습니다.');
+    }
+  };
+
+  const handleNewSession = async () => {
+    if (!notebookId) return;
+    try {
+      const session = await createChatSession(notebookId);
+      setSessionId(session.sessionId);
+      setMessages([]);
+      setSessions((prev) => [{ sessionId: session.sessionId, updatedAt: session.createdAt }, ...prev]);
+      setSessionMenuOpen(false);
+    } catch (error) {
+      console.error('새 대화 시작 실패:', error);
+      alert('새 대화를 시작하지 못했습니다.');
+    }
+  };
+
+  const handleSwitchSession = async (session: ChatSession) => {
+    setSessionMenuOpen(false);
+    if (session.sessionId === sessionId) return;
+    try {
+      const history = await getChatMessages(session.sessionId);
+      setSessionId(session.sessionId);
+      setMessages(history);
+    } catch (error) {
+      console.error('대화 불러오기 실패:', error);
+      alert('대화를 불러오지 못했습니다.');
+    }
+  };
+
+  const handleDeleteSession = async (session: ChatSession, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!window.confirm('이 대화를 삭제할까요?')) return;
+
+    try {
+      await deleteChatSession(session.sessionId);
+      setSessions((prev) => prev.filter((s) => s.sessionId !== session.sessionId));
+      if (session.sessionId === sessionId) {
+        setSessionId(null);
+        setMessages([]);
+      }
+    } catch (error) {
+      console.error('대화 삭제 실패:', error);
+      alert('대화 삭제에 실패했습니다.');
+    }
+  };
+
   const sendMessage = async (text: string) => {
     if (!text.trim() || !notebookId) return;
 
@@ -182,6 +288,7 @@ const NotebookPage = () => {
         const session = await createChatSession(notebookId);
         sid = session.sessionId;
         setSessionId(sid);
+        setSessions((prev) => [{ sessionId: sid!, updatedAt: session.createdAt }, ...prev]);
       }
 
       setMessages((prev) => [...prev, { id: assistantId, role: 'ASSISTANT', content: '' }]);
@@ -345,12 +452,29 @@ const NotebookPage = () => {
                     gap: '8px',
                   }}
                 >
-                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.name}</span>
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{s.name}</span>
                   {s.status !== 'DONE' && (
                     <span style={{ fontSize: '11px', color: 'var(--ink-soft)', flex: 'none' }}>
                       {s.status === 'ERROR' ? '오류' : s.status === 'PROCESSING' ? '처리 중' : '대기'}
                     </span>
                   )}
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteSource(s)}
+                    title="소스 삭제"
+                    style={{
+                      flex: 'none',
+                      background: 'transparent',
+                      border: 'none',
+                      cursor: 'pointer',
+                      color: 'var(--ink-soft)',
+                      fontSize: '14px',
+                      padding: '2px 4px',
+                      lineHeight: 1,
+                    }}
+                  >
+                    ✕
+                  </button>
                 </li>
               ))}
             </ul>
@@ -358,8 +482,90 @@ const NotebookPage = () => {
         </section>
 
         {/* 채팅 */}
-        <section style={{ backgroundColor: 'var(--bg)', display: 'flex', flexDirection: 'column', padding: '20px', minHeight: 0 }}>
-          <h2 style={{ fontSize: '15px', fontWeight: 700, margin: '0 0 14px' }}>채팅</h2>
+        <section style={{ backgroundColor: 'var(--bg)', display: 'flex', flexDirection: 'column', padding: '20px', minHeight: 0, position: 'relative' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
+            <h2 style={{ fontSize: '15px', fontWeight: 700, margin: 0 }}>채팅</h2>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              {sessions.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setSessionMenuOpen((v) => !v)}
+                  style={{
+                    background: 'transparent',
+                    border: '1px solid var(--leaf-line)',
+                    borderRadius: '999px',
+                    padding: '4px 10px',
+                    fontSize: '12px',
+                    color: 'var(--ink-soft)',
+                    cursor: 'pointer',
+                  }}
+                >
+                  대화 목록 ({sessions.length}) ▾
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={handleNewSession}
+                style={{
+                  background: 'transparent',
+                  border: '1px solid var(--leaf-line)',
+                  borderRadius: '999px',
+                  padding: '4px 10px',
+                  fontSize: '12px',
+                  color: 'var(--leaf-deep)',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                }}
+              >
+                + 새 대화
+              </button>
+            </div>
+          </div>
+
+          {sessionMenuOpen && (
+            <>
+              <div onClick={() => setSessionMenuOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 40 }} />
+              <div
+                style={{
+                  position: 'absolute',
+                  top: '52px',
+                  right: '20px',
+                  background: 'var(--bg)',
+                  border: '1px solid var(--leaf-line)',
+                  borderRadius: '14px',
+                  boxShadow: 'var(--shadow)',
+                  zIndex: 50,
+                  minWidth: '220px',
+                  maxHeight: '260px',
+                  overflowY: 'auto',
+                }}
+              >
+                {sessions.map((s, i) => (
+                  <div
+                    key={s.sessionId}
+                    onClick={() => handleSwitchSession(s)}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: '8px',
+                      padding: '10px 14px',
+                      fontSize: '13px',
+                      cursor: 'pointer',
+                      backgroundColor: s.sessionId === sessionId ? 'var(--leaf-soft)' : 'transparent',
+                      fontWeight: s.sessionId === sessionId ? 700 : 400,
+                    }}
+                  >
+                    <span>{s.title ?? `대화 ${sessions.length - i}`}</span>
+                    <span onClick={(e) => handleDeleteSession(s, e)} style={{ color: 'var(--ink-soft)', flex: 'none' }}>
+                      ✕
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
 
           {messages.length === 0 ? (
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '18px', textAlign: 'center' }}>
