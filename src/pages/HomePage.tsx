@@ -1,125 +1,338 @@
-import React, { useState } from 'react';
+import { useEffect, useState, type CSSProperties } from 'react';
 import { useNavigate } from 'react-router-dom';
+import BrandBlock from '../components/notebook/BrandBlock';
+import SectionHead from '../components/notebook/SectionHead';
+import HistoryCard from '../components/notebook/HistoryCard';
+import AddCard from '../components/notebook/AddCard';
+import { listNotebooks, deleteNotebook, updateNotebook, type NotebookSummary } from '../utils/notebookStore';
+
+const menuBtnStyle: CSSProperties = {
+  display: 'block',
+  width: '100%',
+  textAlign: 'left',
+  padding: '10px 14px',
+  fontSize: '13px',
+  background: 'transparent',
+  border: 'none',
+  cursor: 'pointer',
+  color: 'var(--ink)',
+  fontFamily: 'inherit',
+};
 
 const HomePage = () => {
   const navigate = useNavigate();
 
-  // ==========================================
-  // 💡 데이터 세팅 (나중에 백엔드 API로 받아올 부분)
-  // ==========================================
-  
-  // 1. 추천 노트북 (미리 세팅된 템플릿 예시)
   const recommendedNotebooks = [
-    { id: 't1', title: 'C / Java 알고리즘 패턴', desc: '초보자를 위한 핵심 문법과 기출문제 풀이 템플릿', tag: '💻 프로그래밍' },
-    { id: 't2', title: '일러스트레이터 가이드', desc: '패스파인더 활용 및 캐릭터 타이포그래피 레퍼런스', tag: '🎨 디자인' },
-    { id: 't3', title: '스키야키 황금 레시피', desc: '집에서 즐기는 완벽한 재료 손질과 육수 비법', tag: '🍳 요리' },
+    {
+      id: 't1',
+      title: 'C / Java 알고리즘 패턴',
+      desc: '초보자를 위한 핵심 문법과 기출문제 풀이 템플릿',
+      tag: '💻 프로그래밍',
+    },
+    {
+      id: 't2',
+      title: '일러스트레이터 가이드',
+      desc: '패스파인더 활용 및 캐릭터 타이포그래피 레퍼런스',
+      tag: '🎨 디자인',
+    },
+    {
+      id: 't3',
+      title: '스키야키 황금 레시피',
+      desc: '집에서 즐기는 완벽한 재료 손질과 육수 비법',
+      tag: '🍳 요리',
+    },
   ];
 
-  // 2. 최근 노트북 (내가 예전에 만들었던 방들)
-  const recentNotebooks = [
-    { id: 'n1', title: '리눅스(Ubuntu) 명령어 요약본', date: '2026. 4. 20.', sourceCount: 3 },
-    { id: 'n2', title: '레이저 제모 후 스킨케어 루틴', date: '2026. 4. 15.', sourceCount: 1 },
-    { id: 'n3', title: '제목 없는 노트북', date: '2026. 4. 10.', sourceCount: 0 },
-  ];
+  // NB01_NOTE02: GET /notebooks (keyword 검색 지원)
+  const [keyword, setKeyword] = useState('');
+  const [recentNotebooks, setRecentNotebooks] = useState<NotebookSummary[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
+
+  // SCR06: 노트북 제목/설명 수정, 삭제 — 전용 모달
+  const [editTarget, setEditTarget] = useState<NotebookSummary | null>(null);
+  const [editTitle, setEditTitle] = useState('');
+  const [editDescription, setEditDescription] = useState('');
+  const [editSaving, setEditSaving] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<NotebookSummary | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  const refresh = async (kw: string) => {
+    setIsLoading(true);
+    try {
+      const data = await listNotebooks(kw || undefined);
+      setRecentNotebooks(data);
+    } catch (error) {
+      console.error('노트북 목록 조회 실패:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    const timer = setTimeout(() => refresh(keyword), 250); // 타이핑마다 바로 쏘지 않도록 살짝 디바운스
+    return () => clearTimeout(timer);
+  }, [keyword]);
+
+  const openEditModal = (nb: NotebookSummary) => {
+    setEditTarget(nb);
+    setEditTitle(nb.title);
+    setEditDescription(nb.description ?? '');
+    setMenuOpenId(null);
+  };
+  const closeEditModal = () => setEditTarget(null);
+
+  const handleSaveEdit = async () => {
+    if (!editTarget || !editTitle.trim()) return;
+    setEditSaving(true);
+    try {
+      // NB01_NOTE03
+      await updateNotebook(editTarget.id, { title: editTitle.trim(), description: editDescription.trim() || undefined });
+      closeEditModal();
+      refresh(keyword);
+    } catch (error) {
+      console.error('노트북 수정 실패:', error);
+      alert('수정에 실패했습니다.');
+    } finally {
+      setEditSaving(false);
+    }
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      // NB01_NOTE04
+      await deleteNotebook(deleteTarget.id);
+      setDeleteTarget(null);
+      refresh(keyword);
+    } catch (error) {
+      console.error('노트북 삭제 실패:', error);
+      alert('삭제에 실패했습니다.');
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   return (
     <div style={{ height: '100%', backgroundColor: 'var(--bg)', overflowY: 'auto' }}>
-      
-      {/* 1. 상단바 (로비 전용 헤더) */}
       <header className="topbar">
         <div className="topbar-inner container">
           <div className="topbar-row">
-            
-            <div className="brand">
-              <div className="mascot"><span className="eyes"><span></span><span></span></span></div>
-              <div className="brand-text">
-                <h1 className="name">BottaBot</h1>
-                <span className="status"><span className="dot"></span>내 작업 공간 (로비)</span>
-              </div>
-            </div>
-            
-            {/* 우측 상단 검색창 (NotebookLM 스타일) */}
-            <div className="composer" style={{ padding: '8px 16px', width: '260px', borderRadius: '12px' }}>
-              <svg viewBox="0 0 24 24" style={{width:'16px', fill:'none', stroke:'var(--ink-soft)', strokeWidth:2}}>
-                <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/>
-              </svg>
-              <input type="text" placeholder="노트북 검색..." style={{marginLeft: '8px', fontSize: '13.5px'}} />
-            </div>
+            <BrandBlock name="BottaBot" status="내 작업 공간 (로비)" />
 
+            <div className="composer" style={{ padding: '8px 16px', width: '260px', borderRadius: '12px' }}>
+              <svg
+                viewBox="0 0 24 24"
+                style={{ width: '16px', fill: 'none', stroke: 'var(--ink-soft)', strokeWidth: 2 }}
+              >
+                <circle cx="11" cy="11" r="8" />
+                <path d="M21 21l-4.3-4.3" />
+              </svg>
+              <input
+                type="text"
+                value={keyword}
+                onChange={(e) => setKeyword(e.target.value)}
+                placeholder="노트북 검색..."
+                style={{ marginLeft: '8px', fontSize: '13.5px' }}
+              />
+            </div>
           </div>
         </div>
       </header>
 
-      {/* 2. 메인 콘텐츠 영역 */}
       <main className="dashboard-main container">
-        
-        {/* --- 섹션 A: 추천 노트북 --- */}
-        <div className="section-head" style={{ marginTop: '10px' }}>
-          <h2>추천 노트북</h2>
-          <span>미리 준비된 템플릿으로 시작해보세요</span>
-        </div>
-        
+        <SectionHead
+          title="추천 노트북"
+          subtitle="미리 준비된 템플릿으로 시작해보세요"
+          style={{ marginTop: '10px' }}
+        />
+
         <div className="history-grid" style={{ marginBottom: '48px' }}>
           {recommendedNotebooks.map((item) => (
-            <div 
-              className="history-card" 
-              key={item.id} 
+            <HistoryCard
+              key={item.id}
+              tag={item.tag}
+              title={item.title}
+              meta={item.desc}
+              highlighted
               onClick={() => navigate(`/notebook/new?template=${item.id}`)}
-              style={{ backgroundColor: 'var(--leaf-soft)', border: 'none' }} // 추천 템플릿은 배경색을 넣어 구분감 부여
-            >
-              <div className="row-top">
-                <span className="tag" style={{ color: 'var(--black)' }}>{item.tag}</span>
-              </div>
-              <div className="summary" style={{ fontSize: '16px', fontWeight: 800, marginBottom: '8px', color: 'var(--black)' }}>
-                {item.title}
-              </div>
-              <div className="meta" style={{ color: 'var(--ink)' }}>{item.desc}</div>
-            </div>
+              tagStyle={{ color: 'var(--black)' }}
+              titleStyle={{
+                fontSize: '16px',
+                fontWeight: 800,
+                marginBottom: '8px',
+                color: 'var(--black)',
+              }}
+              metaStyle={{ color: 'var(--ink)' }}
+            />
           ))}
         </div>
 
-        {/* --- 섹션 B: 최근 노트북 --- */}
-        <div className="section-head">
-          <h2>최근 노트북</h2>
-          <span>총 {recentNotebooks.length}개</span>
-        </div>
-        
+        <SectionHead title="최근 노트북" subtitle={isLoading ? '불러오는 중...' : `총 ${recentNotebooks.length}개`} />
+
         <div className="history-grid">
-          
-          {/* [ + 새 노트 만들기 ] 카드 (최우측 상단 우선 배치) */}
-          <div 
-            className="history-card add-card" 
-            onClick={() => navigate('/notebook/new')}
-            style={{ flexDirection: 'column', gap: '10px' }}
-          >
-            <span className="plus-circle" style={{ width: '48px', height: '48px', backgroundColor: '#fff', border: '1px solid var(--leaf-line)' }}>
-              <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
-            </span>
-            <span style={{ fontSize: '14px', fontWeight: 800, color: 'var(--leaf-deep)' }}>새 노트 만들기</span>
-          </div>
+          <AddCard label="새 노트 만들기" onClick={() => navigate('/notebook/new')} />
 
-          {/* 내가 생성했던 기존 노트북들 */}
-          {recentNotebooks.map((nb) => (
-            <div className="history-card" key={nb.id} onClick={() => navigate(`/notebook/${nb.id}`)}>
-              <div className="row-top">
-                <span className="tag">내 노트북</span>
-                {/* 우측 상단 더보기(점 3개) 버튼 */}
-                <svg viewBox="0 0 24 24" style={{width:'18px', cursor:'pointer', stroke:'var(--ink-soft)', fill:'none', strokeWidth:2}}>
-                  <circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/>
-                </svg>
-              </div>
-              <div className="summary" style={{ fontSize: '15.5px', fontWeight: 700, marginTop: '8px' }}>
-                {nb.title}
-              </div>
-              <div className="meta" style={{ marginTop: '18px', fontSize: '12px' }}>
-                {nb.date} • 소스 {nb.sourceCount}개
-              </div>
-            </div>
-          ))}
+          {recentNotebooks.map((nb) => {
+            const isMenuOpen = menuOpenId === nb.id;
 
+            return (
+              <div
+                key={nb.id}
+                className="history-card"
+                style={{ position: 'relative' }}
+                onClick={() => navigate(`/notebook/${nb.id}`)}
+              >
+                <div className="row-top">
+                  <span className="tag">내 노트북</span>
+                  <svg
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setMenuOpenId(isMenuOpen ? null : nb.id);
+                    }}
+                    viewBox="0 0 24 24"
+                    style={{ width: '18px', cursor: 'pointer', stroke: 'var(--ink-soft)', fill: 'none', strokeWidth: 2 }}
+                  >
+                    <circle cx="12" cy="12" r="1" />
+                    <circle cx="12" cy="5" r="1" />
+                    <circle cx="12" cy="19" r="1" />
+                  </svg>
+                </div>
+
+                <div className="summary" style={{ fontSize: '15.5px', fontWeight: 700, marginTop: '8px' }}>
+                  {nb.title}
+                </div>
+                {nb.description && (
+                  <div style={{ fontSize: '12px', color: 'var(--ink-soft)', marginTop: '4px' }}>{nb.description}</div>
+                )}
+                <div className="meta" style={{ marginTop: '18px', fontSize: '12px' }}>
+                  {new Date(nb.updatedAt).toLocaleDateString('ko-KR')} • 소스 {nb.sourceCount}개
+                </div>
+
+                {isMenuOpen && (
+                  <>
+                    <div
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setMenuOpenId(null);
+                      }}
+                      style={{ position: 'fixed', inset: 0, zIndex: 40 }}
+                    />
+                    <div
+                      onClick={(e) => e.stopPropagation()}
+                      style={{
+                        position: 'absolute',
+                        top: '38px',
+                        right: '14px',
+                        background: 'var(--bg)',
+                        border: '1px solid var(--leaf-line)',
+                        borderRadius: '14px',
+                        boxShadow: 'var(--shadow)',
+                        zIndex: 50,
+                        minWidth: '150px',
+                        overflow: 'hidden',
+                      }}
+                    >
+                      <button
+                        type="button"
+                        style={menuBtnStyle}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setMenuOpenId(null);
+                          setDeleteTarget(nb);
+                        }}
+                      >
+                        🗑 삭제
+                      </button>
+                      <button
+                        type="button"
+                        style={menuBtnStyle}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openEditModal(nb);
+                        }}
+                      >
+                        ✏️ 제목 수정
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            );
+          })}
         </div>
       </main>
 
+      {/* SCR06: 노트북 제목/설명 수정 모달 */}
+      {editTarget && (
+        <div
+          onClick={closeEditModal}
+          style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{ backgroundColor: 'var(--bg)', borderRadius: '24px', padding: '28px', width: '90%', maxWidth: '440px', boxShadow: 'var(--shadow)' }}
+          >
+            <h2 style={{ fontSize: '18px', margin: '0 0 18px' }}>노트북 정보 수정</h2>
+
+            <div className="field">
+              <label>제목</label>
+              <input value={editTitle} onChange={(e) => setEditTitle(e.target.value)} autoFocus />
+            </div>
+
+            <div className="field">
+              <label>설명 (선택)</label>
+              <input
+                value={editDescription}
+                onChange={(e) => setEditDescription(e.target.value)}
+                placeholder="이 노트북에 대한 설명을 입력하세요"
+              />
+            </div>
+
+            <div style={{ display: 'flex', gap: '10px', marginTop: '6px' }}>
+              <button type="button" className="btn btn-outline" style={{ flex: 1 }} onClick={closeEditModal}>
+                취소
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                style={{ flex: 1 }}
+                disabled={editSaving || !editTitle.trim()}
+                onClick={handleSaveEdit}
+              >
+                {editSaving ? '저장 중...' : '저장'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* SCR06: 노트북 삭제 확인 모달 */}
+      {deleteTarget && (
+        <div
+          onClick={() => setDeleteTarget(null)}
+          style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{ backgroundColor: 'var(--bg)', borderRadius: '24px', padding: '28px', width: '90%', maxWidth: '400px', boxShadow: 'var(--shadow)', textAlign: 'center' }}
+          >
+            <h2 style={{ fontSize: '18px', margin: '0 0 10px' }}>노트북을 삭제할까요?</h2>
+            <p style={{ fontSize: '13.5px', color: 'var(--ink-soft)', margin: '0 0 22px' }}>
+              "{deleteTarget.title}"의 모든 소스와 대화 기록이 함께 삭제됩니다. 되돌릴 수 없습니다.
+            </p>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button type="button" className="btn btn-outline" style={{ flex: 1 }} onClick={() => setDeleteTarget(null)}>
+                취소
+              </button>
+              <button type="button" className="btn btn-danger ready" style={{ flex: 1 }} disabled={deleting} onClick={handleConfirmDelete}>
+                {deleting ? '삭제 중...' : '삭제'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

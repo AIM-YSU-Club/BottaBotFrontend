@@ -1,4 +1,5 @@
-import axios, { InternalAxiosRequestConfig } from 'axios';
+import axios from 'axios';
+import type { AxiosRequestConfig, InternalAxiosRequestConfig } from 'axios';
 
 // 🚀 2번 해결: TypeScript 에러 방지를 위해 기존 Axios 설정 타입에 _retry 속성 추가
 interface CustomAxiosRequestConfig extends InternalAxiosRequestConfig {
@@ -79,4 +80,21 @@ api.interceptors.response.use(
   }
 );
 
-export default api;
+// 응답 인터셉터가 실제로는 response.data(성공 포맷이면 response.data.data)를 반환하도록
+// 언랩하는데, axios 기본 타입은 여전히 Promise<AxiosResponse<T>>라고 주장합니다.
+// 그래서 `api.get(...).someField` 같은 코드가 `tsc -b`(실제 빌드)에서만 걸리는
+// "Property does not exist on AxiosResponse" 에러로 계속 쌓였습니다. 런타임은 그대로 두고
+// 내보내는 타입만 실제 동작(언랩된 데이터)에 맞게 다시 선언합니다.
+// 호출부에서 제네릭을 안 넘기면 any로 느슨하게 받도록 둡니다(엄격한 unknown으로 바꾸면
+// 기존의 타입 안 붙인 api 호출부가 전부 깨집니다).
+/* eslint-disable @typescript-eslint/no-explicit-any */
+interface UnwrappedApiClient {
+  get<T = any>(url: string, config?: AxiosRequestConfig): Promise<T>;
+  post<T = any>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<T>;
+  patch<T = any>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<T>;
+  put<T = any>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<T>;
+  delete<T = any>(url: string, config?: AxiosRequestConfig): Promise<T>;
+}
+/* eslint-enable @typescript-eslint/no-explicit-any */
+
+export default api as unknown as UnwrappedApiClient;
