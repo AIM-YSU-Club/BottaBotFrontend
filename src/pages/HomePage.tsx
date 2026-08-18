@@ -4,7 +4,7 @@ import BrandBlock from '../components/notebook/BrandBlock';
 import SectionHead from '../components/notebook/SectionHead';
 import HistoryCard from '../components/notebook/HistoryCard';
 import AddCard from '../components/notebook/AddCard';
-import { listNotebooks, deleteNotebook, updateNotebook, type NotebookSummary } from '../utils/notebookStore';
+import { listNotebooks, deleteNotebook, updateNotebook, createNotebook, type NotebookSummary } from '../utils/notebookStore';
 
 const menuBtnStyle: CSSProperties = {
   display: 'block',
@@ -56,6 +56,7 @@ const HomePage = () => {
   const [editSaving, setEditSaving] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<NotebookSummary | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [creating, setCreating] = useState(false);
 
   const refresh = async (kw: string) => {
     setIsLoading(true);
@@ -97,9 +98,29 @@ const HomePage = () => {
       setEditSaving(false);
     }
   };
+  // 노트북 추가 API 호출
+  const handleCreateNotebook = async (title = '제목 없는 노트북') => {
+    if (creating) return;
+    setCreating(true);
+    try {
+      const created = await createNotebook(title);
+      const newId = created?.notebookId;
+      if (!newId) throw new Error('생성 응답에 notebookId가 없습니다.');
+      navigate(`/notebook/${newId}`);
+    } catch (error) {
+      console.error('노트북 생성 실패:', error);
+      alert('노트북을 만들지 못했습니다.');
+    } finally {
+      setCreating(false);
+    }
+  };
 
+   // 노트북 삭제 API 호출
   const handleConfirmDelete = async () => {
-    if (!deleteTarget) return;
+    if (!deleteTarget?.id) {
+      alert('노트북 ID를 알 수 없어 삭제할 수 없습니다. 목록을 새로고침해 주세요.');
+      return;
+    }
     setDeleting(true);
     try {
       // NB01_NOTE04
@@ -156,7 +177,7 @@ const HomePage = () => {
               title={item.title}
               meta={item.desc}
               highlighted
-              onClick={() => navigate(`/notebook/new?template=${item.id}`)}
+              onClick={() => handleCreateNotebook(item.title)}
               tagStyle={{ color: 'var(--black)' }}
               titleStyle={{
                 fontSize: '16px',
@@ -172,9 +193,12 @@ const HomePage = () => {
         <SectionHead title="최근 노트북" subtitle={isLoading ? '불러오는 중...' : `총 ${recentNotebooks.length}개`} />
 
         <div className="history-grid">
-          <AddCard label="새 노트 만들기" onClick={() => navigate('/notebook/new')} />
+          <AddCard
+            label={creating ? '만드는 중...' : '새 노트 만들기'}
+            onClick={() => handleCreateNotebook()}
+          />
 
-          {recentNotebooks.map((nb) => {
+          {recentNotebooks.filter((nb) => nb.id).map((nb) => {
             const isMenuOpen = menuOpenId === nb.id;
 
             return (

@@ -67,16 +67,78 @@ const unwrapList = <T,>(data: unknown): T[] => {
   return [];
 };
 
+// 백엔드에서 받은 id값은 String()을 한번 커져 문자열로 확실하게 취급
+const notebookIdOf = (raw: { notebookId?: string; id?: string }) =>
+  String(raw.notebookId ?? raw.id ?? '');
+
+// GET /notebooks 의 응답 JSON을 Source 타입의 오브젝트로 변환
+const normalizeSource = (raw: {
+  sourceId?: string;
+  id?: string;
+  sourceName?: string;
+  name?: string;
+  type?: SourceType;
+  status?: SourceStatus;
+}): Source => ({
+  id: String(raw.sourceId ?? raw.id ?? ''),
+  name: raw.sourceName ?? raw.name ?? '',
+  type: raw.type ?? 'TEXT',
+  status: raw.status ?? 'DONE',
+});
+
+// GET /notebooks 의 응답 JSON을 NotebookSummary 타입의 오브젝트로 변환
+const normalizeSummary = (raw: {
+  notebookId?: string;
+  id?: string;
+  title?: string;
+  description?: string;
+  sourceCount?: number;
+  updatedAt?: string;
+}): NotebookSummary => ({
+  id: notebookIdOf(raw),
+  title: raw.title ?? '',
+  description: raw.description,
+  sourceCount: raw.sourceCount ?? 0,
+  updatedAt: raw.updatedAt ?? '',
+});
+
+// GET /notebooks 의 응답 JSON을 NotebookDetail 타입의 오브젝트로 변환
+const normalizeDetail = (raw: {
+  notebookId?: string;
+  id?: string;
+  title?: string;
+  description?: string;
+  sourceCount?: number;
+  updatedAt?: string;
+  sources?: Parameters<typeof normalizeSource>[0][];
+}): NotebookDetail => ({
+  ...normalizeSummary(raw),
+  sources: (raw.sources ?? []).map(normalizeSource),
+});
+
 // ── 노트북 (NB01) ──────────────────────────────────────────
 export const createNotebook = (title: string, description?: string) =>
   api.post<{ notebookId: string; createdAt: string }>('/notebooks', { title, description });
 
 export const listNotebooks = async (keyword?: string): Promise<NotebookSummary[]> => {
-  const data = await api.get('/notebooks', { params: { keyword, sort: 'updatedAt,desc', size: 50 } });
-  return unwrapList<NotebookSummary>(data);
+  // GET /notebooks — Swagger: keyword(optional) + pageable{page,size,sort}(required)
+  // Spring Pageable은 JSON 객체가 아니라 펼친 쿼리 파라미터로 받습니다.
+  const params: Record<string, string | number> = {
+    page: 0,
+    size: 50,
+    sort: 'updatedAt',
+  };
+  const trimmed = keyword?.trim();
+  if (trimmed) params.keyword = trimmed;
+
+  const data = await api.get('/notebooks', { params });
+  return unwrapList<Parameters<typeof normalizeSummary>[0]>(data).map(normalizeSummary);
 };
 
-export const getNotebook = (notebookId: string) => api.get<NotebookDetail>(`/notebooks/${notebookId}`);
+export const getNotebook = async (notebookId: string): Promise<NotebookDetail> => {
+  const data = await api.get<Parameters<typeof normalizeDetail>[0]>(`/notebooks/${notebookId}`);
+  return normalizeDetail(data);
+};
 
 // NB01_NOTE03: title/description 둘 다 선택값이라 부분 수정으로 씁니다.
 export const updateNotebook = (notebookId: string, patch: { title?: string; description?: string }) =>
