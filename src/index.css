@@ -298,6 +298,10 @@ a { text-decoration: none; }
 .dot { width:6px; height:6px; border-radius:50%; background:var(--leaf-deep); display:inline-block; animation:pulse 1.6s infinite ease-in-out; }
 @keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:.35;} }
 
+/* 열고 닫는 드롭다운/패널류에 쓰는 살짝 미끄러지며 나타나는 모션 */
+@keyframes dropdown-in { from { opacity:0; transform:translateY(-6px); } to { opacity:1; transform:translateY(0); } }
+.dropdown-panel { transform-origin: top right; animation: dropdown-in .16s ease-out; }
+
 .upload-btn {
   display:flex; align-items:center; gap:7px; border:none; cursor:pointer;
   background:var(--gradient); color:#fff; font-family:inherit; font-size:13px; font-weight:600;

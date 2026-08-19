@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import axios from 'axios';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 import ChatComposer from '../components/notebook/ChatComposer';
 import {
@@ -29,6 +30,18 @@ interface ChatMessage {
 }
 
 const suggestions = ['새로운 주제에 관해 알아보기', '새로운 항목 만들기', '프로젝트 진행하기'];
+
+// 소스 추가(파일/웹사이트/텍스트) 실패 시 서버가 준 실제 이유를 최대한 보여줍니다.
+// alert만 봐서는 "안 된다"밖에 몰라서, 원인 파악을 위해 상세 메시지를 덧붙입니다.
+const describeSourceError = (error: unknown): string => {
+  if (axios.isAxiosError(error)) {
+    const serverMessage = error.response?.data?.error?.message || error.response?.data?.message;
+    if (serverMessage) return serverMessage;
+    if (error.response?.status) return `서버 응답 코드: ${error.response.status}`;
+    if (error.code === 'ERR_NETWORK') return '서버에 연결하지 못했습니다. 백엔드 주소/CORS 설정을 확인해 주세요.';
+  }
+  return '알 수 없는 오류가 발생했습니다.';
+};
 
 const NotebookPage = () => {
   const { id } = useParams();
@@ -170,7 +183,7 @@ const NotebookPage = () => {
       closeSourceModal();
     } catch (error) {
       console.error('파일 업로드 실패:', error);
-      alert('파일 업로드에 실패했습니다.');
+      alert(`파일 업로드에 실패했습니다.\n${describeSourceError(error)}`);
     } finally {
       setSourceBusy(false);
       e.target.value = '';
@@ -189,7 +202,7 @@ const NotebookPage = () => {
       closeSourceModal();
     } catch (error) {
       console.error('URL 소스 추가 실패:', error);
-      alert('URL 소스를 추가하지 못했습니다. 크롤링이 차단됐을 수 있어요.');
+      alert(`URL 소스를 추가하지 못했습니다.\n${describeSourceError(error)}`);
     } finally {
       setSourceBusy(false);
     }
@@ -206,7 +219,7 @@ const NotebookPage = () => {
       closeSourceModal();
     } catch (error) {
       console.error('텍스트 소스 추가 실패:', error);
-      alert('텍스트 소스를 추가하지 못했습니다.');
+      alert(`텍스트 소스를 추가하지 못했습니다.\n${describeSourceError(error)}`);
     } finally {
       setSourceBusy(false);
     }
@@ -421,7 +434,17 @@ const NotebookPage = () => {
         </div>
       </header>
 
-      <div style={{ flex: 1, display: 'grid', gridTemplateColumns: '320px 1fr', gap: '1px', backgroundColor: 'var(--leaf-line)', overflow: 'hidden' }}>
+      <div
+        style={{
+          flex: 1,
+          display: 'grid',
+          gridTemplateColumns: sessionMenuOpen ? '320px 1fr 260px' : '320px 1fr 0px',
+          gap: '1px',
+          backgroundColor: 'var(--leaf-line)',
+          overflow: 'hidden',
+          transition: 'grid-template-columns .2s ease',
+        }}
+      >
         {/* 출처 */}
         <section style={{ backgroundColor: 'var(--bg)', padding: '20px', overflowY: 'auto' }}>
           <h2 style={{ fontSize: '15px', fontWeight: 700, margin: '0 0 14px' }}>출처</h2>
@@ -429,7 +452,14 @@ const NotebookPage = () => {
           <button type="button" className="btn btn-outline" onClick={openSourceModal} style={{ marginBottom: '16px' }}>
             + 소스 추가
           </button>
-          <input type="file" ref={fileInputRef} style={{ display: 'none' }} multiple onChange={handleFileChange} />
+          <input
+            type="file"
+            ref={fileInputRef}
+            style={{ display: 'none' }}
+            multiple
+            accept=".pdf,.docx,.txt,.pptx,.xlsx,.jpg,.jpeg,.png,.gif,.webp,.heic,.heif,image/*"
+            onChange={handleFileChange}
+          />
 
           {sources.length === 0 ? (
             <div style={{ marginTop: '32px', textAlign: 'center', color: 'var(--ink-soft)', fontSize: '13px', lineHeight: 1.6 }}>
@@ -484,27 +514,11 @@ const NotebookPage = () => {
 
         {/* 채팅 */}
         <section style={{ backgroundColor: 'var(--bg)', display: 'flex', flexDirection: 'column', padding: '20px', minHeight: 0, position: 'relative' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '14px' }}>
             <h2 style={{ fontSize: '15px', fontWeight: 700, margin: 0 }}>채팅</h2>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              {sessions.length > 0 && (
-                <button
-                  type="button"
-                  onClick={() => setSessionMenuOpen((v) => !v)}
-                  style={{
-                    background: 'transparent',
-                    border: '1px solid var(--leaf-line)',
-                    borderRadius: '999px',
-                    padding: '4px 10px',
-                    fontSize: '12px',
-                    color: 'var(--ink-soft)',
-                    cursor: 'pointer',
-                  }}
-                >
-                  대화 목록 ({sessions.length}) ▾
-                </button>
-              )}
+            {/* New Chat 버튼 + 그 아래 우측 사이드 패널을 열고 닫는 토글 */}
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '8px' }}>
               <button
                 type="button"
                 onClick={handleNewSession}
@@ -519,124 +533,162 @@ const NotebookPage = () => {
                   cursor: 'pointer',
                 }}
               >
-                + 새 대화
+                + New Chat
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setSessionMenuOpen((v) => !v)}
+                title="대화 기록"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: '28px',
+                  height: '28px',
+                  background: sessionMenuOpen ? 'var(--leaf-soft)' : 'transparent',
+                  border: '1px solid var(--leaf-line)',
+                  borderRadius: '999px',
+                  color: sessionMenuOpen ? 'var(--leaf-deep)' : 'var(--ink-soft)',
+                  cursor: 'pointer',
+                }}
+              >
+                <svg viewBox="0 0 24 24" style={{ width: '15px', height: '15px', fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round' }}>
+                  <path d="M4 7h16M4 12h16M4 17h16" />
+                </svg>
               </button>
             </div>
           </div>
 
-          {sessionMenuOpen && (
-            <>
-              <div onClick={() => setSessionMenuOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 40 }} />
-              <div
-                style={{
-                  position: 'absolute',
-                  top: '52px',
-                  right: '20px',
-                  background: 'var(--bg)',
-                  border: '1px solid var(--leaf-line)',
-                  borderRadius: '14px',
-                  boxShadow: 'var(--shadow)',
-                  zIndex: 50,
-                  minWidth: '220px',
-                  maxHeight: '260px',
-                  overflowY: 'auto',
-                }}
-              >
-                {sessions.map((s, i) => (
-                  <div
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+              {messages.length === 0 ? (
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '18px', textAlign: 'center' }}>
+                  <span style={{ fontSize: '40px' }}>👋</span>
+                  <div>
+                    <h1 style={{ fontSize: '22px', margin: '0 0 10px' }}>노트북을 시작해 보세요...</h1>
+                    <p style={{ fontSize: '14px', color: 'var(--ink-soft)', maxWidth: '360px', margin: '0 auto' }}>
+                      새로운 것을 이해하고, 만들고, 발전시킬 수 있는 나만의 빈 캔버스입니다. 소스를 추가해서 시작해보세요.
+                    </p>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', width: '260px' }}>
+                    {suggestions.map((s) => (
+                      <button key={s} type="button" className="btn btn-outline" onClick={() => sendMessage(s)}>
+                        {s}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '10px', padding: '4px 4px 12px' }}>
+                  {messages.map((m) => (
+                    <div key={m.id} style={{ alignSelf: m.role === 'USER' ? 'flex-end' : 'flex-start', maxWidth: '70%' }}>
+                      <div
+                        style={{
+                          backgroundColor: m.role === 'USER' ? 'var(--black)' : 'var(--leaf-soft)',
+                          color: m.role === 'USER' ? '#fff' : 'var(--ink)',
+                          padding: '10px 14px',
+                          borderRadius: '16px',
+                          fontSize: '14px',
+                          lineHeight: 1.5,
+                          whiteSpace: 'pre-wrap',
+                        }}
+                      >
+                        {m.content}
+                      </div>
+
+                      {/* CHAT01_CHAT02: 출처 인용 표시 */}
+                      {m.citations && m.citations.length > 0 && (
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '6px' }}>
+                          {m.citations.map((c, i) => (
+                            <span
+                              key={i}
+                              title={c.url}
+                              style={{
+                                fontSize: '11px',
+                                padding: '3px 9px',
+                                borderRadius: '999px',
+                                border: '1px solid var(--leaf-line)',
+                                color: 'var(--leaf-deep)',
+                                fontWeight: 700,
+                              }}
+                            >
+                              📄 {c.fileName ?? c.url ?? '출처'}
+                              {c.page ? ` p.${c.page}` : ''}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                  {isReplying && (
+                    <div style={{ alignSelf: 'flex-start', color: 'var(--ink-soft)', fontSize: '13px', padding: '4px 6px' }}>
+                      답변을 생성하는 중...
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <ChatComposer value={msgInput} onChange={setMsgInput} onSubmit={handleChatSubmit} placeholder="질문하거나 창작하세요" />
+          </div>
+        </section>
+
+        {/* 대화 기록 — 출처와 같은 구조의 우측 사이드 패널, 아이콘으로 열고 닫음 */}
+        {sessionMenuOpen && (
+          <section className="dropdown-panel" style={{ backgroundColor: 'var(--bg)', padding: '20px', overflowY: 'auto', overflowX: 'hidden' }}>
+            <h2 style={{ fontSize: '15px', fontWeight: 700, margin: '0 0 14px', whiteSpace: 'nowrap' }}>대화 기록</h2>
+
+            {sessions.length === 0 ? (
+              <div style={{ marginTop: '32px', textAlign: 'center', color: 'var(--ink-soft)', fontSize: '13px', lineHeight: 1.6 }}>
+                <p style={{ fontWeight: 700, color: 'var(--ink)', marginBottom: '8px' }}>아직 대화 기록이 없습니다</p>
+                <p>New Chat으로 대화를 시작하면 여기에 목록으로 쌓입니다.</p>
+              </div>
+            ) : (
+              <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {sessions.map((s) => (
+                  <li
                     key={s.sessionId}
                     onClick={() => handleSwitchSession(s)}
                     style={{
+                      fontSize: '13px',
+                      color: 'var(--ink)',
+                      padding: '8px 10px',
+                      border: '1px solid var(--leaf-line)',
+                      borderRadius: '10px',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'space-between',
                       gap: '8px',
-                      padding: '10px 14px',
-                      fontSize: '13px',
                       cursor: 'pointer',
                       backgroundColor: s.sessionId === sessionId ? 'var(--leaf-soft)' : 'transparent',
                       fontWeight: s.sessionId === sessionId ? 700 : 400,
                     }}
                   >
-                    <span>{s.title ?? `대화 ${sessions.length - i}`}</span>
-                    <span onClick={(e) => handleDeleteSession(s, e)} style={{ color: 'var(--ink-soft)', flex: 'none' }}>
-                      ✕
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
+                      {s.title ?? '제목 없는 대화'}
                     </span>
-                  </div>
+                    <button
+                      type="button"
+                      onClick={(e) => handleDeleteSession(s, e)}
+                      title="대화 삭제"
+                      style={{
+                        flex: 'none',
+                        background: 'transparent',
+                        border: 'none',
+                        cursor: 'pointer',
+                        color: 'var(--ink-soft)',
+                        fontSize: '14px',
+                        padding: '2px 4px',
+                        lineHeight: 1,
+                      }}
+                    >
+                      ✕
+                    </button>
+                  </li>
                 ))}
-              </div>
-            </>
-          )}
-
-          {messages.length === 0 ? (
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '18px', textAlign: 'center' }}>
-              <span style={{ fontSize: '40px' }}>👋</span>
-              <div>
-                <h1 style={{ fontSize: '22px', margin: '0 0 10px' }}>노트북을 시작해 보세요...</h1>
-                <p style={{ fontSize: '14px', color: 'var(--ink-soft)', maxWidth: '360px', margin: '0 auto' }}>
-                  새로운 것을 이해하고, 만들고, 발전시킬 수 있는 나만의 빈 캔버스입니다. 소스를 추가해서 시작해보세요.
-                </p>
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', width: '260px' }}>
-                {suggestions.map((s) => (
-                  <button key={s} type="button" className="btn btn-outline" onClick={() => sendMessage(s)}>
-                    {s}
-                  </button>
-                ))}
-              </div>
-            </div>
-          ) : (
-            <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '10px', padding: '4px 4px 12px' }}>
-              {messages.map((m) => (
-                <div key={m.id} style={{ alignSelf: m.role === 'USER' ? 'flex-end' : 'flex-start', maxWidth: '70%' }}>
-                  <div
-                    style={{
-                      backgroundColor: m.role === 'USER' ? 'var(--black)' : 'var(--leaf-soft)',
-                      color: m.role === 'USER' ? '#fff' : 'var(--ink)',
-                      padding: '10px 14px',
-                      borderRadius: '16px',
-                      fontSize: '14px',
-                      lineHeight: 1.5,
-                      whiteSpace: 'pre-wrap',
-                    }}
-                  >
-                    {m.content}
-                  </div>
-
-                  {/* CHAT01_CHAT02: 출처 인용 표시 */}
-                  {m.citations && m.citations.length > 0 && (
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '6px' }}>
-                      {m.citations.map((c, i) => (
-                        <span
-                          key={i}
-                          title={c.url}
-                          style={{
-                            fontSize: '11px',
-                            padding: '3px 9px',
-                            borderRadius: '999px',
-                            border: '1px solid var(--leaf-line)',
-                            color: 'var(--leaf-deep)',
-                            fontWeight: 700,
-                          }}
-                        >
-                          📄 {c.fileName ?? c.url ?? '출처'}
-                          {c.page ? ` p.${c.page}` : ''}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              ))}
-              {isReplying && (
-                <div style={{ alignSelf: 'flex-start', color: 'var(--ink-soft)', fontSize: '13px', padding: '4px 6px' }}>
-                  답변을 생성하는 중...
-                </div>
-              )}
-            </div>
-          )}
-
-          <ChatComposer value={msgInput} onChange={setMsgInput} onSubmit={handleChatSubmit} placeholder="질문하거나 창작하세요" />
-        </section>
+              </ul>
+            )}
+          </section>
+        )}
       </div>
 
       {sourceModalOpen && (
@@ -708,7 +760,7 @@ const NotebookPage = () => {
                   }}
                 >
                   <p style={{ fontWeight: 700, margin: '0 0 4px' }}>또는 파일 드롭</p>
-                  <p style={{ fontSize: '12.5px', color: 'var(--ink-soft)', margin: 0 }}>PDF, DOCX, TXT, PPTX, XLSX (최대 50MB)</p>
+                  <p style={{ fontSize: '12.5px', color: 'var(--ink-soft)', margin: 0 }}>PDF, DOCX, TXT, PPTX, XLSX, 이미지(JPG/PNG 등) (최대 50MB)</p>
                 </div>
 
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px' }}>

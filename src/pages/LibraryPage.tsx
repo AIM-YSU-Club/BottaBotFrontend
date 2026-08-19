@@ -11,6 +11,7 @@ const TYPE_LABEL: Record<SourceType, string> = {
   FILE_TXT: 'TXT',
   FILE_PPTX: 'PPTX',
   FILE_XLSX: 'XLSX',
+  FILE_IMAGE: '이미지',
   URL: '웹사이트',
   TEXT: '텍스트',
 };

@@ -3,7 +3,7 @@
 import api from '../api/axios';
 
 // 명세서 7장(주요 데이터 모델/Enum)
-export type SourceType = 'FILE_PDF' | 'FILE_DOCX' | 'FILE_TXT' | 'FILE_PPTX' | 'FILE_XLSX' | 'URL' | 'TEXT';
+export type SourceType = 'FILE_PDF' | 'FILE_DOCX' | 'FILE_TXT' | 'FILE_PPTX' | 'FILE_XLSX' | 'FILE_IMAGE' | 'URL' | 'TEXT';
 export type SourceStatus = 'PENDING' | 'PROCESSING' | 'DONE' | 'ERROR';
 
 export interface NotebookSummary {
@@ -50,6 +50,13 @@ const EXT_TO_TYPE: Record<string, SourceType> = {
   txt: 'FILE_TXT',
   pptx: 'FILE_PPTX',
   xlsx: 'FILE_XLSX',
+  jpg: 'FILE_IMAGE',
+  jpeg: 'FILE_IMAGE',
+  png: 'FILE_IMAGE',
+  gif: 'FILE_IMAGE',
+  webp: 'FILE_IMAGE',
+  heic: 'FILE_IMAGE',
+  heif: 'FILE_IMAGE',
 };
 
 export const inferFileSourceType = (fileName: string): SourceType => {
@@ -151,9 +158,11 @@ export const uploadFileSource = (notebookId: string, file: File) => {
   const formData = new FormData();
   formData.append('file', file);
   formData.append('fileName', file.name);
-  return api.post<{ sourceId: string; status: SourceStatus }>(`/notebooks/${notebookId}/sources/files`, formData, {
-    headers: { 'Content-Type': 'multipart/form-data' },
-  });
+  // ⚠️ Content-Type을 여기서 직접 지정하면 안 됩니다. multipart는 각 파트를 구분하는
+  // boundary 문자열이 필요한데, 'multipart/form-data'만 수동으로 넣으면 boundary가 빠진
+  // 채로 전송되어 백엔드가 파일 파트를 파싱하지 못합니다(=업로드가 조용히 실패). 헤더를
+  // 아예 지정하지 않아야 브라우저/axios가 boundary까지 채워서 자동으로 설정해 줍니다.
+  return api.post<{ sourceId: string; status: SourceStatus }>(`/notebooks/${notebookId}/sources/files`, formData);
 };
 
 export const addUrlSource = (notebookId: string, url: string) =>
