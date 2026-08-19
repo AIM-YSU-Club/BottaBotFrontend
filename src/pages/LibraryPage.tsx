@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import Mascot from '../components/common/Mascot';
+import BrandBlock from '../components/notebook/BrandBlock';
+import UserMenu from '../components/common/UserMenu';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 import { listAllSources, type SourceType, type SourceWithNotebook } from '../utils/notebookStore';
 
@@ -59,29 +60,23 @@ const LibraryPage = () => {
       <header className="topbar">
         <div className="topbar-inner container">
           <div className="topbar-row">
-            <div className="brand">
-              <Mascot size="sm" />
-              <div className="brand-text">
-                <h1 className="name">라이브러리</h1>
-                <span className="status">
-                  <span className="dot"></span>
-                  모든 노트북의 소스 모아보기
-                </span>
-              </div>
-            </div>
+            <BrandBlock name="라이브러리" status="모든 노트북의 소스 모아보기" />
 
-            <div className="composer" style={{ padding: '8px 16px', width: '260px', borderRadius: '12px' }}>
-              <svg viewBox="0 0 24 24" style={{ width: '16px', fill: 'none', stroke: 'var(--ink-soft)', strokeWidth: 2 }}>
-                <circle cx="11" cy="11" r="8" />
-                <path d="M21 21l-4.3-4.3" />
-              </svg>
-              <input
-                type="text"
-                value={keyword}
-                onChange={(e) => setKeyword(e.target.value)}
-                placeholder="소스/노트북 이름 검색..."
-                style={{ marginLeft: '8px', fontSize: '13.5px' }}
-              />
+            <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+              <div className="composer" style={{ padding: '8px 16px', width: '260px', borderRadius: '12px' }}>
+                <svg viewBox="0 0 24 24" style={{ width: '16px', fill: 'none', stroke: 'var(--ink-soft)', strokeWidth: 2 }}>
+                  <circle cx="11" cy="11" r="8" />
+                  <path d="M21 21l-4.3-4.3" />
+                </svg>
+                <input
+                  type="text"
+                  value={keyword}
+                  onChange={(e) => setKeyword(e.target.value)}
+                  placeholder="소스/노트북 이름 검색..."
+                  style={{ marginLeft: '8px', fontSize: '13.5px' }}
+                />
+              </div>
+              <UserMenu />
             </div>
           </div>
         </div>

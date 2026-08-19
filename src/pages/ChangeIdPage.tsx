@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import api from '../api/axios';
 import FormField from '../components/common/FormField';
-import Mascot from '../components/common/Mascot';
 import AuthPageLayout from '../components/auth/AuthPageLayout';
 import AuthHeader from '../components/auth/AuthHeader';
 
@@ -51,17 +50,12 @@ const ChangeIdPage = () => {
   };
 
   return (
-    <AuthPageLayout as="form" onSubmit={handleChangeId}>
-      <Mascot size="xl" />
-      <AuthHeader heading="이메일(아이디) 변경" sub="새로운 이메일을 입력해 주세요" />
-
-      <FormField
-        label="현재 이메일"
-        type="text"
-        value={currentEmail}
-        disabled
-        style={{ color: 'var(--ink-soft)' }}
-      />
+    <AuthPageLayout
+      as="form"
+      onSubmit={handleChangeId}
+      side={<AuthHeader heading="이메일(아이디) 변경" sub="새로운 이메일을 입력해 주세요" />}
+    >
+      <FormField label="현재 이메일" type="text" value={currentEmail} disabled />
 
       <FormField
         label="현재 비밀번호"
@@ -79,14 +73,16 @@ const ChangeIdPage = () => {
         value={newEmail}
         onChange={(e) => setNewEmail(e.target.value)}
         required
+        containerStyle={{ marginBottom: '32px' }}
       />
 
-      <button type="submit" className="btn btn-primary">
-        변경하기
-      </button>
-
-      <div className="link-row" style={{ marginTop: '20px' }}>
-        <a onClick={() => navigate(-1)}>← 이전 페이지로 돌아가기</a>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px' }}>
+        <a onClick={() => navigate('/profile')} style={{ fontSize: '13.5px', fontWeight: 700, cursor: 'pointer' }}>
+          ← 돌아가기
+        </a>
+        <button type="submit" className="btn btn-primary" style={{ display: 'inline-block', width: 'auto', padding: '14px 32px', margin: 0 }}>
+          변경하기
+        </button>
       </div>
     </AuthPageLayout>
   );

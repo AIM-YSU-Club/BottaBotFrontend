@@ -1,5 +1,4 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import MainLayout from './components/layout/MainLayout';
 import HomePage from './pages/HomePage';
 import LoginPage from './pages/LoginPage';
 import SignUpPage from './pages/SignUpPage';
@@ -32,61 +31,60 @@ const App = () => {
             }
           />
 
-          <Route element={<MainLayout />}>
-            <Route
-              path="/"
-              element={
-                <ProtectedRoute>
-                  <HomePage />
-                </ProtectedRoute>
-              }
-            />
+          {/* 새 디자인에는 고정 사이드바가 없습니다 — 각 페이지가 자체 헤더(아바타 드롭다운 등)를 가집니다 */}
+          <Route
+            path="/"
+            element={
+              <ProtectedRoute>
+                <HomePage />
+              </ProtectedRoute>
+            }
+          />
 
-            <Route
-              path="/library"
-              element={
-                <ProtectedRoute>
-                  <LibraryPage />
-                </ProtectedRoute>
-              }
-            />
+          <Route
+            path="/library"
+            element={
+              <ProtectedRoute>
+                <LibraryPage />
+              </ProtectedRoute>
+            }
+          />
 
-            <Route
-              path="/profile"
-              element={
-                <ProtectedRoute>
-                  <ProfilePage />
-                </ProtectedRoute>
-              }
-            />
+          <Route
+            path="/profile"
+            element={
+              <ProtectedRoute>
+                <ProfilePage />
+              </ProtectedRoute>
+            }
+          />
 
-            <Route
-              path="/change-id"
-              element={
-                <ProtectedRoute>
-                  <ChangeIdPage />
-                </ProtectedRoute>
-              }
-            />
+          <Route
+            path="/change-id"
+            element={
+              <ProtectedRoute>
+                <ChangeIdPage />
+              </ProtectedRoute>
+            }
+          />
 
-            <Route
-              path="/settings"
-              element={
-                <ProtectedRoute>
-                  <SettingPage />
-                </ProtectedRoute>
-              }
-            />
+          <Route
+            path="/settings"
+            element={
+              <ProtectedRoute>
+                <SettingPage />
+              </ProtectedRoute>
+            }
+          />
 
-            <Route
-              path="/deactivate"
-              element={
-                <ProtectedRoute>
-                  <DeactivatePage />
-                </ProtectedRoute>
-              }
-            />
-          </Route>
+          <Route
+            path="/deactivate"
+            element={
+              <ProtectedRoute>
+                <DeactivatePage />
+              </ProtectedRoute>
+            }
+          />
 
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

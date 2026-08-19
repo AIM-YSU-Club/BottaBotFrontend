@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import api from '../api/axios';
 import FormField from '../components/common/FormField';
-import Mascot from '../components/common/Mascot';
 import AuthPageLayout from '../components/auth/AuthPageLayout';
 import AuthHeader from '../components/auth/AuthHeader';
 import WarningBox from '../components/settings/WarningBox';
@@ -48,10 +47,7 @@ const DeactivatePage = () => {
 
   if (step === 1) {
     return (
-      <AuthPageLayout>
-        <Mascot size="xl" />
-        <AuthHeader heading="회원 탈퇴" sub="탈퇴 전 아래 내용을 확인해 주세요" />
-
+      <AuthPageLayout side={<AuthHeader heading="회원 탈퇴" sub="탈퇴 전 아래 내용을 확인해 주세요" />}>
         <WarningBox
           title="⚠ 탈퇴 시 삭제되는 항목"
           items={[
@@ -74,10 +70,11 @@ const DeactivatePage = () => {
 
   if (step === 2) {
     return (
-      <AuthPageLayout as="form" onSubmit={handleWithdrawSubmit}>
-        <Mascot size="xl" />
-        <AuthHeader heading="회원 탈퇴 확인" sub="안전한 처리를 위해 정보를 입력해 주세요" />
-
+      <AuthPageLayout
+        as="form"
+        onSubmit={handleWithdrawSubmit}
+        side={<AuthHeader heading="회원 탈퇴 확인" sub="안전한 처리를 위해 정보를 입력해 주세요" />}
+      >
         <FormField
           label="비밀번호 확인"
           type="password"
@@ -98,26 +95,28 @@ const DeactivatePage = () => {
           value={confirmText}
           onChange={(e) => setConfirmText(e.target.value)}
           required
+          containerStyle={{ marginBottom: '32px' }}
         />
 
-        <button
-          type="submit"
-          className={`btn ${isReadyToWithdraw ? 'btn-danger ready' : 'btn-danger'}`}
-          disabled={!isReadyToWithdraw}
-          style={{ opacity: isReadyToWithdraw ? 1 : 0.5 }}
-        >
-          최종 탈퇴
-        </button>
-        <button type="button" className="btn btn-outline" onClick={() => setStep(1)}>
-          ← 이전 단계로
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px' }}>
+          <a onClick={() => setStep(1)} style={{ fontSize: '13.5px', fontWeight: 700, cursor: 'pointer' }}>
+            ← 이전 단계로
+          </a>
+          <button
+            type="submit"
+            className="btn btn-danger ready"
+            disabled={!isReadyToWithdraw}
+            style={{ display: 'inline-block', width: 'auto', padding: '14px 32px', margin: 0, opacity: isReadyToWithdraw ? 1 : 0.5 }}
+          >
+            최종 탈퇴
+          </button>
+        </div>
       </AuthPageLayout>
     );
   }
 
   return (
-    <AuthPageLayout cardStyle={{ textAlign: 'center' }}>
-      <Mascot size="xl" grayscale />
+    <AuthPageLayout cardStyle={{ maxWidth: '440px', padding: '56px 44px', textAlign: 'center' }}>
       <div className="auth-title">BottaBot</div>
 
       <div className="done-emoji">👋</div>
@@ -128,7 +127,7 @@ const DeactivatePage = () => {
         언제든 다시 돌아오세요!
       </div>
 
-      <button type="button" className="btn btn-primary" onClick={() => navigate('/login')}>
+      <button type="button" className="btn btn-primary" style={{ marginTop: '28px' }} onClick={() => navigate('/login')}>
         처음 화면으로
       </button>
     </AuthPageLayout>

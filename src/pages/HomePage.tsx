@@ -4,7 +4,9 @@ import BrandBlock from '../components/notebook/BrandBlock';
 import SectionHead from '../components/notebook/SectionHead';
 import HistoryCard from '../components/notebook/HistoryCard';
 import AddCard from '../components/notebook/AddCard';
+import UserMenu from '../components/common/UserMenu';
 import { listNotebooks, deleteNotebook, updateNotebook, createNotebook, type NotebookSummary } from '../utils/notebookStore';
+
 
 const menuBtnStyle: CSSProperties = {
   display: 'block',
@@ -22,24 +24,33 @@ const menuBtnStyle: CSSProperties = {
 const HomePage = () => {
   const navigate = useNavigate();
 
-  const recommendedNotebooks = [
+  const recommendedNotebooks: {
+    id: string;
+    title: string;
+    desc: string;
+    tag: string;
+    dot: { color: string; shape?: 'square' | 'circle' | 'diamond' };
+  }[] = [
     {
       id: 't1',
       title: 'C / Java 알고리즘 패턴',
       desc: '초보자를 위한 핵심 문법과 기출문제 풀이 템플릿',
-      tag: '💻 프로그래밍',
+      tag: '프로그래밍',
+      dot: { color: 'var(--leaf-deep)', shape: 'square' },
     },
     {
       id: 't2',
       title: '일러스트레이터 가이드',
       desc: '패스파인더 활용 및 캐릭터 타이포그래피 레퍼런스',
-      tag: '🎨 디자인',
+      tag: '디자인',
+      dot: { color: 'var(--danger)', shape: 'circle' },
     },
     {
       id: 't3',
       title: '스키야키 황금 레시피',
       desc: '집에서 즐기는 완벽한 재료 손질과 육수 비법',
-      tag: '🍳 요리',
+      tag: '요리',
+      dot: { color: 'var(--leaf)', shape: 'diamond' },
     },
   ];
 
@@ -142,21 +153,24 @@ const HomePage = () => {
           <div className="topbar-row">
             <BrandBlock name="BottaBot" status="내 작업 공간 (로비)" />
 
-            <div className="composer" style={{ padding: '8px 16px', width: '260px', borderRadius: '12px' }}>
-              <svg
-                viewBox="0 0 24 24"
-                style={{ width: '16px', fill: 'none', stroke: 'var(--ink-soft)', strokeWidth: 2 }}
-              >
-                <circle cx="11" cy="11" r="8" />
-                <path d="M21 21l-4.3-4.3" />
-              </svg>
-              <input
-                type="text"
-                value={keyword}
-                onChange={(e) => setKeyword(e.target.value)}
-                placeholder="노트북 검색..."
-                style={{ marginLeft: '8px', fontSize: '13.5px' }}
-              />
+            <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+              <div className="composer" style={{ padding: '8px 16px', width: '260px', borderRadius: '12px' }}>
+                <svg
+                  viewBox="0 0 24 24"
+                  style={{ width: '16px', fill: 'none', stroke: 'var(--ink-soft)', strokeWidth: 2 }}
+                >
+                  <circle cx="11" cy="11" r="8" />
+                  <path d="M21 21l-4.3-4.3" />
+                </svg>
+                <input
+                  type="text"
+                  value={keyword}
+                  onChange={(e) => setKeyword(e.target.value)}
+                  placeholder="노트북 검색..."
+                  style={{ marginLeft: '8px', fontSize: '13.5px' }}
+                />
+              </div>
+              <UserMenu />
             </div>
           </div>
         </div>
@@ -179,24 +193,22 @@ const HomePage = () => {
               highlighted
               onClick={() => handleCreateNotebook(item.title)}
               tagStyle={{ color: 'var(--black)' }}
+
               titleStyle={{
                 fontSize: '16px',
                 fontWeight: 800,
                 marginBottom: '8px',
                 color: 'var(--black)',
               }}
-              metaStyle={{ color: 'var(--ink)' }}
+              metaStyle={{ color: 'var(--ink)', fontSize: '13px', lineHeight: 1.55 }}
             />
           ))}
         </div>
 
-        <SectionHead title="최근 노트북" subtitle={isLoading ? '불러오는 중...' : `총 ${recentNotebooks.length}개`} />
+        <SectionHead title="최근 노트북" subtitle={isLoading ? '불러오는 중...' : `${recentNotebooks.length}개`} />
 
         <div className="history-grid">
-          <AddCard
-            label={creating ? '만드는 중...' : '새 노트 만들기'}
-            onClick={() => handleCreateNotebook()}
-          />
+          <AddCard label="새 노트북 만들기" onClick={() => handleCreateNotebook()} />
 
           {recentNotebooks.filter((nb) => nb.id).map((nb) => {
             const isMenuOpen = menuOpenId === nb.id;
