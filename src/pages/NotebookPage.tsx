@@ -4,7 +4,6 @@ import Mascot from '../components/common/Mascot';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 import ChatComposer from '../components/notebook/ChatComposer';
 import {
-  createNotebook,
   getNotebook,
   updateNotebook,
   uploadFileSource,
@@ -66,21 +65,17 @@ const NotebookPage = () => {
       setLoadError(false);
       try {
         if (id === 'new') {
-          // NB01_NOTE01: POST /notebooks — 서버가 진짜 notebookId를 내려줄 때까지는
-          // 아무것도 로컬에 만들지 않고, 받은 id로 바로 갈아탑니다.
-          const created = await createNotebook('제목 없는 노트북');
-          if (!cancelled) navigate(`/notebook/${created.notebookId}`, { replace: true });
+          if (!cancelled) navigate('/', { replace: true });
           return;
         }
 
         const detail = await getNotebook(id);
         if (cancelled) return;
-        setNotebookId(detail.id);
+        setNotebookId(detail.id || id);
         setTitle(detail.title);
         setDescription(detail.description ?? '');
         setSources(detail.sources ?? []);
 
-        // CHAT01_CHAT03: 기존 대화 세션이 있으면 가장 최근 것을 이어서 보여줍니다.
         try {
           const sessionList = await listChatSessions(id);
           if (cancelled) return;
@@ -96,7 +91,10 @@ const NotebookPage = () => {
         }
       } catch (error) {
         console.error('노트북 로딩 실패:', error);
-        if (!cancelled) setLoadError(true);
+        if (!cancelled) {
+          setLoadError(true);
+          setIsLoading(false);
+        }
       } finally {
         if (!cancelled) setIsLoading(false);
       }
@@ -135,7 +133,6 @@ const NotebookPage = () => {
   const handleMetaBlur = async () => {
     if (!notebookId || !title.trim()) return;
     try {
-      // NB01_NOTE03: title/description 둘 다 넘길 수 있어서 같이 저장합니다.
       await updateNotebook(notebookId, { title: title.trim(), description: description.trim() || undefined });
     } catch (error) {
       console.error('노트북 정보 저장 실패:', error);
@@ -154,13 +151,18 @@ const NotebookPage = () => {
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
-    if (!files || files.length === 0 || !notebookId) return;
+    if (!files || files.length === 0) return;
+    if (!notebookId) {
+      alert('노트북을 아직 준비 중입니다. 잠시 후 다시 시도해 주세요.');
+      return;
+    }
+    const targetId = notebookId;
 
     setSourceBusy(true);
     try {
       // SRC01_UPLOAD01
       for (const file of Array.from(files)) {
-        const res = await uploadFileSource(notebookId, file);
+        const res = await uploadFileSource(targetId, file);
         setSources((prev) => [
           ...prev,
           { id: res.sourceId, name: file.name, type: inferFileSourceType(file.name), status: res.status },
@@ -180,7 +182,6 @@ const NotebookPage = () => {
     if (!websiteUrl.trim() || !notebookId) return;
     setSourceBusy(true);
     try {
-      // SRC01_UPLOAD02
       const res = await addUrlSource(notebookId, websiteUrl.trim());
       setSources((prev) => [
         ...prev,
@@ -199,11 +200,10 @@ const NotebookPage = () => {
     if (!pasteText.trim() || !notebookId) return;
     setSourceBusy(true);
     try {
-      // SRC01_UPLOAD03
       const preview = pasteText.trim().slice(0, 24);
-      const title = `📋 ${preview}${pasteText.trim().length > 24 ? '…' : ''}`;
-      const res = await addTextSource(notebookId, pasteText.trim(), title);
-      setSources((prev) => [...prev, { id: res.sourceId, name: title, type: 'TEXT', status: res.status }]);
+      const sourceTitle = `📋 ${preview}${pasteText.trim().length > 24 ? '…' : ''}`;
+      const res = await addTextSource(notebookId, pasteText.trim(), sourceTitle);
+      setSources((prev) => [...prev, { id: res.sourceId, name: sourceTitle, type: 'TEXT', status: res.status }]);
       closeSourceModal();
     } catch (error) {
       console.error('텍스트 소스 추가 실패:', error);
@@ -273,6 +273,7 @@ const NotebookPage = () => {
 
   const sendMessage = async (text: string) => {
     if (!text.trim() || !notebookId) return;
+    const targetId = notebookId;
 
     setMessages((prev) => [...prev, { id: crypto.randomUUID(), role: 'USER', content: text.trim() }]);
     setMsgInput('');
@@ -285,7 +286,7 @@ const NotebookPage = () => {
       // CHAT01_CHAT03: 세션이 없으면 먼저 만들고, 있으면 재사용합니다.
       let sid = sessionId;
       if (!sid) {
-        const session = await createChatSession(notebookId);
+        const session = await createChatSession(targetId);
         sid = session.sessionId;
         setSessionId(sid);
         setSessions((prev) => [{ sessionId: sid!, updatedAt: session.createdAt }, ...prev]);
@@ -332,7 +333,7 @@ const NotebookPage = () => {
     sendMessage(msgInput);
   };
 
-  if (isLoading) return <LoadingSpinner message={id === 'new' ? '노트북을 만드는 중...' : '노트북을 불러오는 중...'} />;
+  if (isLoading) return <LoadingSpinner message="노트북을 불러오는 중..." />;
 
   if (loadError || !notebookId) {
     return (
@@ -410,11 +411,11 @@ const NotebookPage = () => {
 
             <div style={{ flex: 1 }} />
 
-            <button className="upload-btn" type="button" onClick={() => navigate('/notebook/new')}>
+            <button className="upload-btn" type="button" onClick={openSourceModal}>
               <svg viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M12 5v14M5 12h14" />
               </svg>
-              노트북 만들기
+              소스 추가
             </button>
           </div>
         </div>

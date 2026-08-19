@@ -17,14 +17,6 @@ const LoginPage = () => {
     e.preventDefault();
     if (!email || !password) return;
 
-    if (email === 'jobeomjun1234@gmail.com' && password === '1234') {
-      sessionStorage.setItem('accessToken', 'test-fake-access-token');
-      sessionStorage.setItem('refreshToken', 'test-fake-refresh-token');
-      alert('테스트 계정으로 로그인되었습니다! (백엔드 통신 생략)');
-      navigate('/');
-      return;
-    }
-
     try {
       // API 명세 2장(MEM01_LOGIN_N01): POST /auth/login { email, password, rememberMe }
       // → { accessToken, refreshToken, member 요약 }
@@ -110,9 +102,8 @@ const LoginPage = () => {
       <button type="submit" className="btn btn-primary">
         로그인하기
       </button>
-
       <p style={{ margin: '12px 0', fontSize: '12px', color: 'var(--ink-soft)', textAlign: 'center' }}>
-        * 테스트 계정: jobeomjun1234@gmail.com / 1234
+        * 테스트용 DB 연동 계정: jehee826@gmail.com / jehee826
       </p>
 
       <button type="button" className="btn btn-outline" onClick={() => navigate('/signup')}>
