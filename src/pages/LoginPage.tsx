@@ -70,10 +70,11 @@ const LoginPage = () => {
 
   return (
     <>
-      <AuthPageLayout as="form" onSubmit={handleLoginSubmit}>
-        <Mascot size="xl" />
-        <AuthHeader heading="로그인" sub="계정에 로그인하세요" />
-
+      <AuthPageLayout
+        as="form"
+        onSubmit={handleLoginSubmit}
+        side={<AuthHeader heading="로그인" sub="계정에 로그인하세요" />}
+      >
         <FormField
           label="학교 이메일 (아이디)"
           type="email"

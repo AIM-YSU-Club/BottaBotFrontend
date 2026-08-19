@@ -6,20 +6,29 @@ interface CustomAxiosRequestConfig extends InternalAxiosRequestConfig {
   _retry?: boolean;
 }
 
-// 1. 명세서에 지정된 기본 API 주소 설정
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL,
-  headers: {
-    'Content-Type': 'application/json',
-  },
 });
+
+const unsetContentType = (headers: InternalAxiosRequestConfig['headers']) => {
+  if (!headers) return;
+  if (typeof headers.delete === 'function') {
+    headers.delete('Content-Type');
+    return;
+  }
+  delete (headers as Record<string, unknown>)['Content-Type'];
+  delete (headers as Record<string, unknown>)['content-type'];
+};
 
 // 2. 요청(Request) 인터셉터: 모든 API 요청을 보낼 때 토큰을 자동으로 붙여줍니다.
 api.interceptors.request.use(
   (config) => {
+    if (typeof FormData !== 'undefined' && config.data instanceof FormData) {
+      unsetContentType(config.headers);
+    }
+
     const accessToken = sessionStorage.getItem('accessToken');
     if (accessToken) {
-      // TypeScript가 headers가 undefined일 수도 있다고 걱정하므로 안전하게 처리
       config.headers = config.headers || {};
       config.headers.Authorization = `Bearer ${accessToken}`;
     }
