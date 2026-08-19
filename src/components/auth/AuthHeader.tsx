@@ -7,7 +7,7 @@ interface AuthHeaderProps {
 const AuthHeader = ({ title = 'BottaBot', heading, sub }: AuthHeaderProps) => {
   return (
     <>
-      <div className="auth-title">{title}</div>
+      <div className="auth-brand">{title}</div>
       <div className="auth-heading">{heading}</div>
       <div className="auth-sub">{sub}</div>
     </>

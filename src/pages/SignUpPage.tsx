@@ -4,7 +4,6 @@ import axios from 'axios';
 import api from '../api/axios';
 import FormField from '../components/common/FormField';
 import InputWithAction from '../components/common/InputWithAction';
-import Mascot from '../components/common/Mascot';
 import TermsCheckbox from '../components/common/TermsCheckbox';
 import AuthPageLayout from '../components/auth/AuthPageLayout';
 import AuthHeader from '../components/auth/AuthHeader';
@@ -18,12 +17,9 @@ const SignUpPage = () => {
   const [email, setEmail] = useState('');
   const [verificationCode, setVerificationCode] = useState('');
   const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
 
   const [isNicknameChecked, setIsNicknameChecked] = useState(false);
   const [agreeTerms, setAgreeTerms] = useState(false);
-
-  const passwordMismatch = confirmPassword.length > 0 && password !== confirmPassword;
 
   const handleCheckNickname = async () => {
     if (!nickname.trim()) {
@@ -82,10 +78,6 @@ const SignUpPage = () => {
       alert('인증번호를 입력해주세요.');
       return;
     }
-    if (password !== confirmPassword) {
-      alert('비밀번호가 일치하지 않습니다.');
-      return;
-    }
 
     try {
       const signupPayload = {
@@ -121,11 +113,13 @@ const SignUpPage = () => {
   };
 
   return (
-    <AuthPageLayout as="form" onSubmit={handleSignUpSubmit}>
-      <Mascot size="xl" />
-      <AuthHeader heading="회원가입" sub="BottaBot과 함께 시작해요" />
-
-      <div style={{ display: 'flex', gap: '12px' }}>
+    <AuthPageLayout
+      as="form"
+      onSubmit={handleSignUpSubmit}
+      cardStyle={{ maxWidth: '900px' }}
+      side={<AuthHeader heading="회원가입" sub="BottaBot과 함께 시작해요" />}
+    >
+      <div style={{ display: 'flex', gap: '14px' }}>
         <FormField
           label="이름"
           type="text"
@@ -149,7 +143,7 @@ const SignUpPage = () => {
       <InputWithAction
         label="닉네임"
         type="text"
-        placeholder="서비스 사용할 닉네임"
+        placeholder="서비스에서 사용할 닉네임"
         value={nickname}
         onChange={(e) => {
           setNickname(e.target.value);
@@ -158,11 +152,7 @@ const SignUpPage = () => {
         required
         actionLabel={isNicknameChecked ? '확인 완료' : '중복 확인'}
         onAction={handleCheckNickname}
-        actionClassName="btn"
-        actionStyle={{
-          backgroundColor: isNicknameChecked ? 'var(--leaf-deep)' : 'var(--black)',
-          color: 'white',
-        }}
+        actionStyle={{ backgroundColor: isNicknameChecked ? 'var(--leaf-deep)' : 'var(--black)' }}
       />
 
       <InputWithAction
@@ -192,22 +182,8 @@ const SignUpPage = () => {
         value={password}
         onChange={(e) => setPassword(e.target.value)}
         required
+        containerStyle={{ marginBottom: '28px' }}
       />
-
-      <FormField
-        label="비밀번호 확인"
-        type="password"
-        placeholder="비밀번호를 한 번 더 입력하세요"
-        value={confirmPassword}
-        onChange={(e) => setConfirmPassword(e.target.value)}
-        required
-        containerStyle={passwordMismatch ? { marginBottom: '4px' } : undefined}
-      />
-      {passwordMismatch && (
-        <p style={{ color: 'var(--danger)', fontSize: '12px', margin: '0 0 16px' }}>
-          비밀번호가 일치하지 않습니다.
-        </p>
-      )}
 
       <TermsCheckbox
         checked={agreeTerms}
@@ -215,16 +191,13 @@ const SignUpPage = () => {
         label="이용약관 및 개인정보처리방침에 동의합니다"
       />
 
-      <button
-        type="submit"
-        className={`btn ${agreeTerms ? 'btn-primary' : 'btn-muted'}`}
-        disabled={!agreeTerms || !password || password !== confirmPassword}
-      >
-        가입하기
-      </button>
-
-      <div className="link-row">
-        <a onClick={() => navigate('/login')}>이미 계정이 있어요</a>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px', marginTop: '28px' }}>
+        <a onClick={() => navigate('/login')} style={{ fontSize: '13.5px', fontWeight: 700, cursor: 'pointer' }}>
+          이미 계정이 있어요
+        </a>
+        <button type="submit" className="btn btn-primary" style={{ display: 'inline-block', width: 'auto', padding: '14px 32px', margin: 0 }}>
+          가입하기
+        </button>
       </div>
     </AuthPageLayout>
   );

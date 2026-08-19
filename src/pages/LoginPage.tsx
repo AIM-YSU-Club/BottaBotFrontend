@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import api from '../api/axios';
 import FormField from '../components/common/FormField';
-import Mascot from '../components/common/Mascot';
 import AuthPageLayout from '../components/auth/AuthPageLayout';
 import AuthHeader from '../components/auth/AuthHeader';
 
@@ -11,7 +10,6 @@ const LoginPage = () => {
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [rememberMe, setRememberMe] = useState(false);
 
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -23,7 +21,7 @@ const LoginPage = () => {
       const data = await api.post('/auth/login', {
         email,
         password,
-        rememberMe,
+        rememberMe: true,
       });
 
       if (data && data.accessToken) {
@@ -52,10 +50,11 @@ const LoginPage = () => {
   };
 
   return (
-    <AuthPageLayout as="form" onSubmit={handleLoginSubmit}>
-      <Mascot size="xl" />
-      <AuthHeader heading="로그인" sub="계정에 로그인하세요" />
-
+    <AuthPageLayout
+      as="form"
+      onSubmit={handleLoginSubmit}
+      side={<AuthHeader heading="로그인" sub="학교 이메일 계정으로 로그인하세요. 이 계정은 BottaBot의 모든 서비스에서 사용됩니다." />}
+    >
       <FormField
         label="학교 이메일 (아이디)"
         type="email"
@@ -63,7 +62,13 @@ const LoginPage = () => {
         value={email}
         onChange={(e) => setEmail(e.target.value)}
         required
+        containerStyle={{ marginBottom: '8px' }}
       />
+      <div style={{ margin: '0 0 20px 4px' }}>
+        <a onClick={() => navigate('/find-account')} style={{ fontSize: '12.5px', fontWeight: 600, cursor: 'pointer' }}>
+          아이디를 잊으셨나요?
+        </a>
+      </div>
 
       <FormField
         label="비밀번호"
@@ -72,33 +77,16 @@ const LoginPage = () => {
         value={password}
         onChange={(e) => setPassword(e.target.value)}
         required
-        containerStyle={{ marginBottom: '10px' }}
+        containerStyle={{ marginBottom: '8px' }}
       />
-
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-          marginBottom: '24px',
-          fontSize: '13px',
-          color: 'var(--ink-soft)',
-        }}
-      >
-        <input
-          type="checkbox"
-          checked={rememberMe}
-          onChange={(e) => setRememberMe(e.target.checked)}
-          style={{ width: 'auto', cursor: 'pointer', accentColor: 'var(--leaf-deep)' }}
-        />
-        <label
-          style={{ margin: 0, fontWeight: 'normal', color: 'inherit', cursor: 'pointer' }}
-          onClick={() => setRememberMe(!rememberMe)}
-        >
-          로그인 상태 유지
-        </label>
+      <div style={{ margin: '0 0 6px 4px' }}>
+        <a onClick={() => navigate('/find-account')} style={{ fontSize: '12.5px', fontWeight: 600, cursor: 'pointer' }}>
+          비밀번호를 잊으셨나요?
+        </a>
       </div>
-
+      <div style={{ fontSize: '11.5px', color: 'var(--ink-faint)', margin: '8px 0 32px 4px' }}>
+        * 테스트 계정: jobeomjun1234@gmail.com / 1234
+      </div>
       <button type="submit" className="btn btn-primary">
         로그인하기
       </button>
@@ -114,6 +102,7 @@ const LoginPage = () => {
         <a onClick={() => navigate('/find-account')}>아이디 찾기</a>
         <span style={{ color: 'var(--leaf-line)' }}>|</span>
         <a onClick={() => navigate('/find-account')}>비밀번호 재설정</a>
+
       </div>
     </AuthPageLayout>
   );

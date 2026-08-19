@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import api from '../api/axios';
 import FormField from '../components/common/FormField';
-import Mascot from '../components/common/Mascot';
 import SegmentTabs from '../components/common/SegmentTabs';
 import AuthPageLayout from '../components/auth/AuthPageLayout';
 import AuthHeader from '../components/auth/AuthHeader';
@@ -97,19 +96,20 @@ const FindAccountPage = () => {
   };
 
   return (
-    <AuthPageLayout>
-      <Mascot size="xl" />
-      <AuthHeader
-        heading={activeTab === 'findId' ? '계정 찾기' : '비밀번호 재설정'}
-        sub={
-          activeTab === 'findId'
-            ? '가입 시 사용한 이름과 학번으로 찾을 수 있어요'
-            : resetStep === 'request'
-              ? '가입 시 등록한 이메일과 전화번호로 인증해 주세요'
-              : '전화번호로 받은 인증번호와 새 비밀번호를 입력해 주세요'
-        }
-      />
-
+    <AuthPageLayout
+      side={
+        <AuthHeader
+          heading={activeTab === 'findId' ? '계정 찾기' : '비밀번호 재설정'}
+          sub={
+            activeTab === 'findId'
+              ? '가입 시 사용한 이름과 학번으로 찾을 수 있어요'
+              : resetStep === 'request'
+                ? '가입 시 등록한 이메일과 전화번호로 인증해 주세요'
+                : '전화번호로 받은 인증번호와 새 비밀번호를 입력해 주세요'
+          }
+        />
+      }
+    >
       <SegmentTabs
         value={activeTab}
         onChange={(v) => {
