@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import api from '../api/axios';
 import FormField from '../components/common/FormField';
-import Mascot from '../components/common/Mascot';
 import AuthPageLayout from '../components/auth/AuthPageLayout';
 import AuthHeader from '../components/auth/AuthHeader';
 
@@ -40,7 +39,7 @@ const LoginPage = () => {
       const data = await api.post('/auth/login', {
         email,
         password,
-        rememberMe,
+        rememberMe: true,
       });
 
       if (data && data.accessToken) {

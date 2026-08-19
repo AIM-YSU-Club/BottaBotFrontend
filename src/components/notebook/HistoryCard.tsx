@@ -8,6 +8,8 @@ interface HistoryCardProps {
   onClick?: () => void;
   showMore?: boolean;
   highlighted?: boolean;
+  /** 태그 앞에 붙는 작은 색상 도형 (추천 노트북 카테고리 표시용) */
+  dot?: { color: string; shape?: 'square' | 'circle' | 'diamond' };
   tagStyle?: React.CSSProperties;
   titleStyle?: React.CSSProperties;
   metaStyle?: React.CSSProperties;
@@ -22,6 +24,7 @@ const HistoryCard = ({
   onClick,
   showMore = false,
   highlighted = false,
+  dot,
   tagStyle,
   titleStyle,
   metaStyle,
@@ -37,8 +40,22 @@ const HistoryCard = ({
       }}
     >
       <div className="row-top">
-        <span className="tag" style={tagStyle}>
-          {tag}
+        <span style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
+          {dot && (
+            <span
+              style={{
+                width: '9px',
+                height: '9px',
+                flex: 'none',
+                background: dot.color,
+                borderRadius: dot.shape === 'circle' ? '50%' : '3px',
+                transform: dot.shape === 'diamond' ? 'rotate(45deg)' : undefined,
+              }}
+            />
+          )}
+          <span className="tag" style={tagStyle}>
+            {tag}
+          </span>
         </span>
         {time && <span className="time">{time}</span>}
         {showMore && (

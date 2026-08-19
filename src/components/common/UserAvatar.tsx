@@ -12,7 +12,7 @@ const UserAvatar = ({ name, size = 'sm', style }: UserAvatarProps) => {
       <div
         className="avatar-lg"
         style={{
-          backgroundColor: 'var(--black)',
+          background: 'var(--gradient-diag)',
           color: 'white',
           display: 'flex',
           justifyContent: 'center',

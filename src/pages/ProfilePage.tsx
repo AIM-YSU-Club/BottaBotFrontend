@@ -4,7 +4,6 @@ import axios from 'axios';
 import api from '../api/axios';
 import { useUser } from '../context/UserContext';
 import FormField from '../components/common/FormField';
-import Mascot from '../components/common/Mascot';
 import UserAvatar from '../components/common/UserAvatar';
 import AuthPageLayout from '../components/auth/AuthPageLayout';
 import AuthHeader from '../components/auth/AuthHeader';
@@ -109,23 +108,28 @@ const ProfilePage = () => {
 
   if (!isVerified) {
     return (
-      <AuthPageLayout as="form" onSubmit={handleVerify}>
-        <Mascot size="xl" />
-        <AuthHeader heading="안전한 사용을 위해" sub="현재 비밀번호를 다시 입력해 주세요" />
-
+      <AuthPageLayout
+        as="form"
+        onSubmit={handleVerify}
+        side={<AuthHeader heading="안전한 사용을 위해" sub="현재 비밀번호를 다시 입력해 주세요" />}
+      >
         <FormField
+          label="현재 비밀번호"
           type="password"
           placeholder="현재 비밀번호 입력"
           value={currentPassword}
           onChange={(e) => setCurrentPassword(e.target.value)}
           required
+          containerStyle={{ marginBottom: '32px' }}
         />
-        <button type="submit" className="btn btn-primary">
-          확인
-        </button>
 
-        <div className="link-row" style={{ marginTop: '20px' }}>
-          <a onClick={() => navigate(-1)}>← 이전 페이지로 돌아가기</a>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px' }}>
+          <a onClick={() => navigate('/')} style={{ fontSize: '13.5px', fontWeight: 700, cursor: 'pointer' }}>
+            ← 이전 페이지로
+          </a>
+          <button type="submit" className="btn btn-primary" style={{ display: 'inline-block', width: 'auto', padding: '14px 32px', margin: 0 }}>
+            확인
+          </button>
         </div>
       </AuthPageLayout>
     );
@@ -153,19 +157,18 @@ const ProfilePage = () => {
             textAlign: 'center',
             fontSize: '12.5px',
             color: 'var(--ink-soft)',
-            margin: '4px 0 24px',
+            margin: '4px 0 32px',
           }}
         >
           {userInfo.email}
         </div>
 
-        <div style={{ display: 'flex', gap: '12px' }}>
+        <div style={{ display: 'flex', gap: '14px' }}>
           <FormField
             label="이름"
             type="text"
             value={userInfo.name}
             disabled
-            style={{ color: 'var(--ink-soft)' }}
             containerStyle={{ flex: 1 }}
           />
           <FormField
@@ -173,18 +176,19 @@ const ProfilePage = () => {
             type="text"
             value={userInfo.studentId}
             disabled
-            style={{ color: 'var(--ink-soft)' }}
             containerStyle={{ flex: 1 }}
           />
         </div>
 
-        <FormField
-          label="학교 이메일 (아이디)"
-          type="text"
-          value={userInfo.email}
-          disabled
-          style={{ color: 'var(--ink-soft)' }}
-        />
+        <div className="field">
+          <label>학교 이메일 (아이디)</label>
+          <div className="field-inline-box disabled">
+            <input type="text" value={userInfo.email} disabled />
+            <a className="field-inline-link" onClick={() => navigate('/change-id')}>
+              변경
+            </a>
+          </div>
+        </div>
 
         <FormField
           label="닉네임 설정"
@@ -197,34 +201,17 @@ const ProfilePage = () => {
         <FormField
           label="새 비밀번호 설정"
           type="password"
-          placeholder="변경할 비밀번호 입력 (변경하지 않으려면 비워두세요)"
+          placeholder="변경하지 않으려면 비워두세요"
           value={newPassword}
           onChange={(e) => setNewPassword(e.target.value)}
+          containerStyle={{ marginBottom: '28px' }}
         />
 
-        <button type="submit" className="btn btn-primary" style={{ marginTop: '20px' }}>
+        <button type="submit" className="btn btn-primary">
           변경 사항 저장
         </button>
 
-        <button
-          type="button"
-          onClick={handleLogout}
-          style={{
-            marginTop: '12px',
-            padding: '12px',
-            borderRadius: '8px',
-            border: '1px solid var(--line)',
-            backgroundColor: 'var(--surface)',
-            color: 'var(--ink)',
-            fontSize: '15px',
-            fontWeight: 600,
-            cursor: 'pointer',
-            transition: 'all 0.2s',
-            width: '100%',
-          }}
-          onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'var(--bg)')}
-          onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'var(--surface)')}
-        >
+        <button type="button" className="btn btn-outline" onClick={handleLogout}>
           로그아웃
         </button>
 
@@ -232,7 +219,6 @@ const ProfilePage = () => {
           type="button"
           className="btn btn-danger-outline"
           onClick={() => navigate('/deactivate')}
-          style={{ marginTop: '12px' }}
         >
           회원 탈퇴 및 비활성화
         </button>

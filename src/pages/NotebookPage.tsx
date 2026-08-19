@@ -1,6 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import Mascot from '../components/common/Mascot';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 import ChatComposer from '../components/notebook/ChatComposer';
 import {
@@ -369,9 +368,10 @@ const NotebookPage = () => {
               </svg>
             </button>
 
-            <Mascot size="sm" />
+            <div style={{ fontSize: '16px', fontWeight: 800, color: 'var(--black)' }}>BottaBot</div>
+            <div style={{ width: '1px', height: '20px', background: 'var(--leaf-line)', margin: '0 14px' }} />
 
-            <div style={{ display: 'flex', flexDirection: 'column', marginLeft: '10px', minWidth: '80px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', minWidth: '80px' }}>
               <input
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
